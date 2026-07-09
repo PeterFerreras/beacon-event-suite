@@ -20,6 +20,7 @@ import { Route as AppEtiquetasRouteImport } from './routes/_app.etiquetas'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConfiguracionRouteImport } from './routes/_app.configuracion'
 import { Route as AppAsistenciaRouteImport } from './routes/_app.asistencia'
+import { Route as AppEventosEventIdRouteImport } from './routes/_app.eventos.$eventId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -75,6 +76,11 @@ const AppAsistenciaRoute = AppAsistenciaRouteImport.update({
   path: '/asistencia',
   getParentRoute: () => AppRoute,
 } as any)
+const AppEventosEventIdRoute = AppEventosEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => AppEventosRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,11 +88,12 @@ export interface FileRoutesByFullPath {
   '/configuracion': typeof AppConfiguracionRoute
   '/dashboard': typeof AppDashboardRoute
   '/etiquetas': typeof AppEtiquetasRoute
-  '/eventos': typeof AppEventosRoute
+  '/eventos': typeof AppEventosRouteWithChildren
   '/invitados': typeof AppInvitadosRoute
   '/registro': typeof AppRegistroRoute
   '/reportes': typeof AppReportesRoute
   '/visitantes': typeof AppVisitantesRoute
+  '/eventos/$eventId': typeof AppEventosEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,11 +101,12 @@ export interface FileRoutesByTo {
   '/configuracion': typeof AppConfiguracionRoute
   '/dashboard': typeof AppDashboardRoute
   '/etiquetas': typeof AppEtiquetasRoute
-  '/eventos': typeof AppEventosRoute
+  '/eventos': typeof AppEventosRouteWithChildren
   '/invitados': typeof AppInvitadosRoute
   '/registro': typeof AppRegistroRoute
   '/reportes': typeof AppReportesRoute
   '/visitantes': typeof AppVisitantesRoute
+  '/eventos/$eventId': typeof AppEventosEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -108,11 +116,12 @@ export interface FileRoutesById {
   '/_app/configuracion': typeof AppConfiguracionRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/etiquetas': typeof AppEtiquetasRoute
-  '/_app/eventos': typeof AppEventosRoute
+  '/_app/eventos': typeof AppEventosRouteWithChildren
   '/_app/invitados': typeof AppInvitadosRoute
   '/_app/registro': typeof AppRegistroRoute
   '/_app/reportes': typeof AppReportesRoute
   '/_app/visitantes': typeof AppVisitantesRoute
+  '/_app/eventos/$eventId': typeof AppEventosEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/registro'
     | '/reportes'
     | '/visitantes'
+    | '/eventos/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/registro'
     | '/reportes'
     | '/visitantes'
+    | '/eventos/$eventId'
   id:
     | '__root__'
     | '/'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_app/registro'
     | '/_app/reportes'
     | '/_app/visitantes'
+    | '/_app/eventos/$eventId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -238,15 +250,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAsistenciaRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/eventos/$eventId': {
+      id: '/_app/eventos/$eventId'
+      path: '/$eventId'
+      fullPath: '/eventos/$eventId'
+      preLoaderRoute: typeof AppEventosEventIdRouteImport
+      parentRoute: typeof AppEventosRoute
+    }
   }
 }
+
+interface AppEventosRouteChildren {
+  AppEventosEventIdRoute: typeof AppEventosEventIdRoute
+}
+
+const AppEventosRouteChildren: AppEventosRouteChildren = {
+  AppEventosEventIdRoute: AppEventosEventIdRoute,
+}
+
+const AppEventosRouteWithChildren = AppEventosRoute._addFileChildren(
+  AppEventosRouteChildren,
+)
 
 interface AppRouteChildren {
   AppAsistenciaRoute: typeof AppAsistenciaRoute
   AppConfiguracionRoute: typeof AppConfiguracionRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppEtiquetasRoute: typeof AppEtiquetasRoute
-  AppEventosRoute: typeof AppEventosRoute
+  AppEventosRoute: typeof AppEventosRouteWithChildren
   AppInvitadosRoute: typeof AppInvitadosRoute
   AppRegistroRoute: typeof AppRegistroRoute
   AppReportesRoute: typeof AppReportesRoute
@@ -258,7 +289,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConfiguracionRoute: AppConfiguracionRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppEtiquetasRoute: AppEtiquetasRoute,
-  AppEventosRoute: AppEventosRoute,
+  AppEventosRoute: AppEventosRouteWithChildren,
   AppInvitadosRoute: AppInvitadosRoute,
   AppRegistroRoute: AppRegistroRoute,
   AppReportesRoute: AppReportesRoute,
@@ -274,3 +305,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

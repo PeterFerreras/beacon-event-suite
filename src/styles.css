@@ -42,33 +42,46 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-display: "Playfair Display", serif;
-  --font-sans: "Inter", sans-serif;
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-green: var(--brand-green);
+  --font-display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+
+  --shadow-elegant: 0 10px 30px -12px oklch(0.25 0.09 258 / 0.28);
+  --shadow-card: 0 1px 2px oklch(0.25 0.09 258 / 0.06), 0 4px 12px -4px oklch(0.25 0.09 258 / 0.08);
+  --gradient-hero: linear-gradient(120deg, var(--navy) 0%, oklch(0.34 0.13 250) 48%, var(--brand-blue) 100%);
+  --gradient-brand: linear-gradient(90deg, var(--brand-blue) 0%, var(--brand-orange) 33%, var(--brand-yellow) 66%, var(--brand-green) 100%);
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
   /* Costa del Faro palette */
   --navy: oklch(0.24 0.05 260);        /* deep navy #0B1E3F */
   --navy-foreground: oklch(0.98 0.005 260);
-  --gold: oklch(0.75 0.13 85);         /* elegant gold #C9A24C */
+  --gold: oklch(0.82 0.16 82);         /* Costa del Faro yellow */
   --gold-foreground: oklch(0.2 0.03 260);
+  --brand-blue: oklch(0.70 0.14 232);
+  --brand-orange: oklch(0.68 0.19 45);
+  --brand-yellow: oklch(0.82 0.16 82);
+  --brand-green: oklch(0.64 0.16 145);
 
-  --background: oklch(0.99 0.003 260);
+  --background: oklch(0.98 0.008 200);
   --foreground: oklch(0.2 0.03 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.03 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.03 260);
-  --primary: oklch(0.24 0.05 260);
+  --primary: oklch(0.56 0.09 195);
   --primary-foreground: oklch(0.98 0.005 260);
   --secondary: oklch(0.96 0.008 260);
   --secondary-foreground: oklch(0.24 0.05 260);
   --muted: oklch(0.96 0.008 260);
   --muted-foreground: oklch(0.5 0.02 260);
-  --accent: oklch(0.75 0.13 85);
-  --accent-foreground: oklch(0.2 0.03 260);
+  --accent: oklch(0.68 0.19 45);
+  --accent-foreground: oklch(0.99 0 0);
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.98 0.005 260);
   --success: oklch(0.62 0.15 155);
@@ -94,23 +107,27 @@
 }
 
 .dark {
-  --background: oklch(0.15 0.03 260);
-  --foreground: oklch(0.98 0.005 260);
-  --card: oklch(0.2 0.04 260);
-  --card-foreground: oklch(0.98 0.005 260);
-  --popover: oklch(0.2 0.04 260);
-  --popover-foreground: oklch(0.98 0.005 260);
-  --primary: oklch(0.75 0.13 85);
-  --primary-foreground: oklch(0.2 0.03 260);
-  --secondary: oklch(0.28 0.04 260);
-  --secondary-foreground: oklch(0.98 0.005 260);
-  --muted: oklch(0.28 0.04 260);
-  --muted-foreground: oklch(0.7 0.02 260);
-  --accent: oklch(0.75 0.13 85);
-  --accent-foreground: oklch(0.2 0.03 260);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.75 0.13 85);
+  color-scheme: dark;
+  --background: oklch(0.2 0.025 220);
+  --foreground: oklch(0.95 0.01 200);
+  --card: oklch(0.25 0.028 220);
+  --card-foreground: oklch(0.95 0.01 200);
+  --popover: oklch(0.25 0.028 220);
+  --popover-foreground: oklch(0.95 0.01 200);
+  --primary: oklch(0.68 0.1 190);
+  --primary-foreground: oklch(0.18 0.03 220);
+  --secondary: oklch(0.3 0.03 220);
+  --secondary-foreground: oklch(0.95 0.01 200);
+  --muted: oklch(0.3 0.03 220);
+  --muted-foreground: oklch(0.72 0.02 210);
+  --accent: oklch(0.75 0.16 58);
+  --accent-foreground: oklch(0.2 0.03 40);
+  --border: oklch(0.34 0.03 220);
+  --input: oklch(0.34 0.03 220);
+  --ring: oklch(0.68 0.1 190);
+  --success: oklch(0.72 0.15 148);
+  --destructive: oklch(0.62 0.19 27);
+  --brand-blue: oklch(0.68 0.12 245);
 }
 
 @layer base {
@@ -119,8 +136,25 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+}
+
+@utility bg-gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+@utility bg-gradient-hero {
+  background-image: var(--gradient-hero);
+}
+
+@utility shadow-elegant {
+  box-shadow: var(--shadow-elegant);
+}
+
+@utility shadow-card-soft {
+  box-shadow: var(--shadow-card);
 }
 
 @utility gold-line {
