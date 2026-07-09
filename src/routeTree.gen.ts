@@ -9,38 +9,165 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppVisitantesRouteImport } from './routes/_app.visitantes'
+import { Route as AppReportesRouteImport } from './routes/_app.reportes'
+import { Route as AppRegistroRouteImport } from './routes/_app.registro'
+import { Route as AppInvitadosRouteImport } from './routes/_app.invitados'
+import { Route as AppEventosRouteImport } from './routes/_app.eventos'
+import { Route as AppEtiquetasRouteImport } from './routes/_app.etiquetas'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConfiguracionRouteImport } from './routes/_app.configuracion'
+import { Route as AppAsistenciaRouteImport } from './routes/_app.asistencia'
 
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppVisitantesRoute = AppVisitantesRouteImport.update({
+  id: '/visitantes',
+  path: '/visitantes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportesRoute = AppReportesRouteImport.update({
+  id: '/reportes',
+  path: '/reportes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRegistroRoute = AppRegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvitadosRoute = AppInvitadosRouteImport.update({
+  id: '/invitados',
+  path: '/invitados',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEventosRoute = AppEventosRouteImport.update({
+  id: '/eventos',
+  path: '/eventos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEtiquetasRoute = AppEtiquetasRouteImport.update({
+  id: '/etiquetas',
+  path: '/etiquetas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracionRoute = AppConfiguracionRouteImport.update({
+  id: '/configuracion',
+  path: '/configuracion',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAsistenciaRoute = AppAsistenciaRouteImport.update({
+  id: '/asistencia',
+  path: '/asistencia',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/asistencia': typeof AppAsistenciaRoute
+  '/configuracion': typeof AppConfiguracionRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/etiquetas': typeof AppEtiquetasRoute
+  '/eventos': typeof AppEventosRoute
+  '/invitados': typeof AppInvitadosRoute
+  '/registro': typeof AppRegistroRoute
+  '/reportes': typeof AppReportesRoute
+  '/visitantes': typeof AppVisitantesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/asistencia': typeof AppAsistenciaRoute
+  '/configuracion': typeof AppConfiguracionRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/etiquetas': typeof AppEtiquetasRoute
+  '/eventos': typeof AppEventosRoute
+  '/invitados': typeof AppInvitadosRoute
+  '/registro': typeof AppRegistroRoute
+  '/reportes': typeof AppReportesRoute
+  '/visitantes': typeof AppVisitantesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/asistencia': typeof AppAsistenciaRoute
+  '/_app/configuracion': typeof AppConfiguracionRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/etiquetas': typeof AppEtiquetasRoute
+  '/_app/eventos': typeof AppEventosRoute
+  '/_app/invitados': typeof AppInvitadosRoute
+  '/_app/registro': typeof AppRegistroRoute
+  '/_app/reportes': typeof AppReportesRoute
+  '/_app/visitantes': typeof AppVisitantesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/asistencia'
+    | '/configuracion'
+    | '/dashboard'
+    | '/etiquetas'
+    | '/eventos'
+    | '/invitados'
+    | '/registro'
+    | '/reportes'
+    | '/visitantes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/asistencia'
+    | '/configuracion'
+    | '/dashboard'
+    | '/etiquetas'
+    | '/eventos'
+    | '/invitados'
+    | '/registro'
+    | '/reportes'
+    | '/visitantes'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/asistencia'
+    | '/_app/configuracion'
+    | '/_app/dashboard'
+    | '/_app/etiquetas'
+    | '/_app/eventos'
+    | '/_app/invitados'
+    | '/_app/registro'
+    | '/_app/reportes'
+    | '/_app/visitantes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +175,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/visitantes': {
+      id: '/_app/visitantes'
+      path: '/visitantes'
+      fullPath: '/visitantes'
+      preLoaderRoute: typeof AppVisitantesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reportes': {
+      id: '/_app/reportes'
+      path: '/reportes'
+      fullPath: '/reportes'
+      preLoaderRoute: typeof AppReportesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/registro': {
+      id: '/_app/registro'
+      path: '/registro'
+      fullPath: '/registro'
+      preLoaderRoute: typeof AppRegistroRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invitados': {
+      id: '/_app/invitados'
+      path: '/invitados'
+      fullPath: '/invitados'
+      preLoaderRoute: typeof AppInvitadosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/eventos': {
+      id: '/_app/eventos'
+      path: '/eventos'
+      fullPath: '/eventos'
+      preLoaderRoute: typeof AppEventosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/etiquetas': {
+      id: '/_app/etiquetas'
+      path: '/etiquetas'
+      fullPath: '/etiquetas'
+      preLoaderRoute: typeof AppEtiquetasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/configuracion': {
+      id: '/_app/configuracion'
+      path: '/configuracion'
+      fullPath: '/configuracion'
+      preLoaderRoute: typeof AppConfiguracionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/asistencia': {
+      id: '/_app/asistencia'
+      path: '/asistencia'
+      fullPath: '/asistencia'
+      preLoaderRoute: typeof AppAsistenciaRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAsistenciaRoute: typeof AppAsistenciaRoute
+  AppConfiguracionRoute: typeof AppConfiguracionRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppEtiquetasRoute: typeof AppEtiquetasRoute
+  AppEventosRoute: typeof AppEventosRoute
+  AppInvitadosRoute: typeof AppInvitadosRoute
+  AppRegistroRoute: typeof AppRegistroRoute
+  AppReportesRoute: typeof AppReportesRoute
+  AppVisitantesRoute: typeof AppVisitantesRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAsistenciaRoute: AppAsistenciaRoute,
+  AppConfiguracionRoute: AppConfiguracionRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppEtiquetasRoute: AppEtiquetasRoute,
+  AppEventosRoute: AppEventosRoute,
+  AppInvitadosRoute: AppInvitadosRoute,
+  AppRegistroRoute: AppRegistroRoute,
+  AppReportesRoute: AppReportesRoute,
+  AppVisitantesRoute: AppVisitantesRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
