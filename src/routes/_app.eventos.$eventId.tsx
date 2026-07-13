@@ -98,7 +98,7 @@ function EventDetail() {
     const nextArrival = attendee.llegada ? undefined : new Date().toISOString().slice(0, 16).replace("T", " ");
     setAttendees((current) => current.map((item) => item.id === attendee.id ? { ...item, llegada: nextArrival } : item));
     if (nextArrival) {
-      setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event.nombre, tipo: attendee.tipo });
+      setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
       setBadgeOpen(true);
     }
     toast.success(nextArrival ? `Llegada registrada: ${attendee.nombre}` : `Llegada retirada: ${attendee.nombre}`);
@@ -122,7 +122,7 @@ function EventDetail() {
     const id = `walk-${Date.now().toString(36)}`;
     const next: Guest = {
       id,
-      eventoId: event.id,
+      eventoId: currentEvent.id,
       nombre: visitorForm.nombre.trim(),
       cedula: visitorForm.cedula.trim() || "Sin documento",
       cargo: visitorForm.cargo.trim() || "Visitante",
@@ -136,7 +136,7 @@ function EventDetail() {
     setAttendees((current) => [next, ...current]);
     setVisitorOpen(false);
     setVisitorForm({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
-    setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: event.nombre, tipo: "Visitante" });
+    setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: currentEvent.nombre, tipo: "Visitante" });
     setBadgeOpen(true);
     toast.success(`Visitante registrado: ${next.nombre}`);
   }
@@ -260,7 +260,7 @@ function EventDetail() {
                           size="icon"
                           aria-label={`Etiqueta ${attendee.nombre}`}
                           onClick={() => {
-                            setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event.nombre, tipo: attendee.tipo });
+                            setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
                             setBadgeOpen(true);
                           }}
                         >
