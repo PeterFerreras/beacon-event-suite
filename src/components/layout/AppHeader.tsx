@@ -28,7 +28,7 @@ export function AppHeader() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-gradient-hero text-primary-foreground shadow-elegant">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-gradient-hero text-white shadow-elegant">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:px-6">
         <div className="flex items-center justify-between gap-4">
           <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
