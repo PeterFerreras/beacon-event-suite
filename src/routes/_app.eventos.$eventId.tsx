@@ -85,7 +85,8 @@ function EventDetail() {
     );
   }
 
-  const mainSession = event.sesiones[0];
+  const currentEvent = event;
+  const mainSession = currentEvent.sesiones[0];
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "Todos", count: stats.total },
     { key: "guest", label: "Invitados", count: stats.guests },
