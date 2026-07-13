@@ -22,9 +22,10 @@ export function BadgePrintModal({
   data: BadgeData | null;
 }) {
   if (!data) return null;
+  const badge = data;
 
   function downloadLabel() {
-    const safeName = data.nombre.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const safeName = badge.nombre.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     const html = `<!doctype html>
 <html>
 <head>
