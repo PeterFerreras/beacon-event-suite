@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/configuracion")({
@@ -17,15 +20,20 @@ export const Route = createFileRoute("/_app/configuracion")({
   component: Configuracion,
 });
 
-const usuarios = [
-  { nombre: "Monica Pena", rol: "Administrador", correo: "mpena@institucion.gob" },
-  { nombre: "Carlos Ruiz", rol: "Recepcion", correo: "cruiz@institucion.gob" },
-  { nombre: "Ana Herrera", rol: "Protocolo", correo: "aherrera@institucion.gob" },
-];
-
-const tipos = ["VIP", "Estandar", "Prensa", "Protocolo"];
-
 function Configuracion() {
+  const queryClient = useQueryClient();
+  const [newType, setNewType] = useState("");
+  const { data: settings = {} } = useQuery({ queryKey: ["settings"], queryFn: apiClient.settings });
+  const { data: usuarios = [] } = useQuery({ queryKey: ["users"], queryFn: apiClient.users });
+  const { data: tipos = [] } = useQuery({ queryKey: ["guest-types"], queryFn: apiClient.guestTypes });
+  const createType = useMutation({
+    mutationFn: apiClient.createGuestType,
+    onSuccess: () => {
+      setNewType("");
+      queryClient.invalidateQueries({ queryKey: ["guest-types"] });
+      toast.success("Tipo agregado");
+    },
+  });
   return (
     <div>
       <PageHeader title="Configuracion" subtitle="Institucion, usuarios, tipos de invitado e impresion." />
@@ -43,7 +51,7 @@ function Configuracion() {
           <Card className="overflow-hidden border-t-2 border-t-primary">
             <CardHeader><CardTitle className="font-display">Datos institucionales</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Label>Nombre institucional</Label><Input defaultValue="Institucion Costa del Faro" className="mt-1.5" /></div>
+              <div className="sm:col-span-2"><Label>Nombre institucional</Label><Input defaultValue={settings.institution_name ?? ""} className="mt-1.5" /></div>
               <div><Label>Logo principal</Label><UploadBox /></div>
               <div><Label>Logo secundario</Label><UploadBox /></div>
               <div className="sm:col-span-2"><Button onClick={() => toast.success("Guardado")}>Guardar cambios</Button></div>
@@ -69,11 +77,11 @@ function Configuracion() {
         <TabsContent value="tipos" className="mt-4">
           <Card className="overflow-hidden border-t-2 border-t-primary"><CardContent className="p-4 sm:p-5">
             <div className="flex flex-wrap gap-2">
-              {tipos.map((t) => <Badge key={t} className="border border-primary/30 bg-primary/10 text-primary">{t}</Badge>)}
+              {tipos.map((t) => <Badge key={t.id} className="border border-primary/30 bg-primary/10 text-primary">{t.nombre}</Badge>)}
             </div>
             <div className="mt-4 flex gap-2">
-              <Input placeholder="Nuevo tipo..." />
-              <Button className="bg-accent text-accent-foreground hover:opacity-90">Agregar</Button>
+              <Input value={newType} onChange={(event) => setNewType(event.target.value)} placeholder="Nuevo tipo..." />
+              <Button className="bg-accent text-accent-foreground hover:opacity-90" onClick={() => newType.trim() && createType.mutate(newType.trim())}>Agregar</Button>
             </div>
           </CardContent></Card>
         </TabsContent>
@@ -89,9 +97,9 @@ function Configuracion() {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Impresora predeterminada</Label><Input defaultValue="HP LaserJet Pro" className="mt-1.5" /></div>
-            <div className="flex items-center gap-3 pt-6"><Switch id="qr" defaultChecked /><Label htmlFor="qr">Incluir codigo QR</Label></div>
-            <div className="flex items-center gap-3 pt-6"><Switch id="foto" /><Label htmlFor="foto">Incluir foto del visitante</Label></div>
+            <div><Label>Impresora predeterminada</Label><Input defaultValue={settings.default_printer ?? ""} className="mt-1.5" /></div>
+            <div className="flex items-center gap-3 pt-6"><Switch id="qr" defaultChecked={settings.include_qr !== "0"} /><Label htmlFor="qr">Incluir codigo QR</Label></div>
+            <div className="flex items-center gap-3 pt-6"><Switch id="foto" defaultChecked={settings.include_photo === "1"} /><Label htmlFor="foto">Incluir foto del visitante</Label></div>
           </CardContent></Card>
         </TabsContent>
 
@@ -99,7 +107,7 @@ function Configuracion() {
           <Card className="overflow-hidden border-t-2 border-t-primary"><CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
             <div className="flex items-center gap-3"><Switch id="notif" defaultChecked /><Label htmlFor="notif">Notificaciones por correo</Label></div>
             <div className="flex items-center gap-3"><Switch id="auto" /><Label htmlFor="auto">Auto-impresion de etiquetas</Label></div>
-            <div><Label>Zona horaria</Label><Input defaultValue="America/Santo_Domingo" className="mt-1.5" /></div>
+            <div><Label>Zona horaria</Label><Input defaultValue={settings.timezone ?? ""} className="mt-1.5" /></div>
             <div><Label>Idioma</Label>
               <Select defaultValue="es"><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="es">Espanol</SelectItem><SelectItem value="en">English</SelectItem></SelectContent>

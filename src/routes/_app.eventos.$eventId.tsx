@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
@@ -23,11 +24,11 @@ import { StatCard } from "@/components/common/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { events, guests, type Guest } from "@/lib/mock-data";
+import { apiClient, type Guest } from "@/lib/api";
 import { toast } from "sonner";
 
 type FilterTab = "all" | "guest" | "visitor" | "pending";
@@ -38,23 +39,94 @@ export const Route = createFileRoute("/_app/eventos/$eventId")({
   component: EventDetail,
 });
 
-function nowStamp() {
-  return new Date().toISOString().slice(0, 16).replace("T", " ");
+function displayTime(value?: string | null) {
+  if (!value) return "";
+  return value.includes(" ") ? value.slice(11, 16) : value.slice(11, 16) || value;
 }
 
 function EventDetail() {
   const { eventId } = Route.useParams();
-  const event = events.find((item) => item.id === eventId);
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<FilterTab>("all");
-  const [attendees, setAttendees] = useState<Guest[]>(() => guests.filter((guest) => guest.eventoId === eventId));
   const [visitorOpen, setVisitorOpen] = useState(false);
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [badge, setBadge] = useState<BadgeData | null>(null);
   const [visitorForm, setVisitorForm] = useState({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
-  const [finalized, setFinalized] = useState(event?.estado === "finalizado");
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+
+  const eventQuery = useQuery({
+    queryKey: ["event", eventId],
+    queryFn: () => apiClient.event(eventId),
+  });
+  const attendeesQuery = useQuery({
+    queryKey: ["guests", eventId],
+    queryFn: () => apiClient.guests(eventId),
+  });
+
+  const event = eventQuery.data;
+  const attendees = attendeesQuery.data ?? [];
+  const finalized = event?.estado === "finalizado";
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["event", eventId] });
+    queryClient.invalidateQueries({ queryKey: ["guests", eventId] });
+    queryClient.invalidateQueries({ queryKey: ["events"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+
+  const checkIn = useMutation({
+    mutationFn: (attendee: Guest) => apiClient.checkInGuest(attendee.id),
+    onSuccess: (_, attendee) => {
+      invalidate();
+      setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event?.nombre, tipo: attendee.tipo });
+      setBadgeOpen(true);
+      toast.success(`Entrada registrada: ${attendee.nombre}`);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar la entrada"),
+  });
+
+  const checkOut = useMutation({
+    mutationFn: (attendee: Guest) => apiClient.checkOutGuest(attendee.id),
+    onSuccess: (_, attendee) => {
+      invalidate();
+      toast.success(`Salida registrada: ${attendee.nombre}`);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar la salida"),
+  });
+
+  const removeGuest = useMutation({
+    mutationFn: apiClient.deleteGuest,
+    onSuccess: () => {
+      invalidate();
+      toast.success("Registro eliminado");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo eliminar el registro"),
+  });
+
+  const createWalkIn = useMutation({
+    mutationFn: () => apiClient.createWalkIn(eventId, visitorForm),
+    onSuccess: (next) => {
+      invalidate();
+      setVisitorOpen(false);
+      setVisitorForm({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
+      setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: event?.nombre, tipo: "Visitante" });
+      setBadgeOpen(true);
+      toast.success(`Visitante registrado: ${next.nombre}`);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar el visitante"),
+  });
+
+  const finalizeEvent = useMutation({
+    mutationFn: () => apiClient.updateEvent(eventId, { estado: "finalizado" }),
+    onSuccess: () => {
+      invalidate();
+      setFinalizeOpen(false);
+      toast.success("Evento finalizado");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo finalizar el evento"),
+  });
 
   const stats = useMemo(() => ({
     total: attendees.length,
@@ -82,6 +154,10 @@ function EventDetail() {
     return list;
   }, [attendees, query, tab]);
 
+  if (eventQuery.isLoading) {
+    return <Card className="border-t-2 border-t-primary p-10 text-center text-sm text-muted-foreground">Cargando evento...</Card>;
+  }
+
   if (!event) {
     return (
       <div>
@@ -95,8 +171,7 @@ function EventDetail() {
     );
   }
 
-  const currentEvent = event;
-  const mainSession = currentEvent.sesiones[0];
+  const mainSession = event.sesiones[0];
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "Todos", count: stats.total },
     { key: "guest", label: "Invitados", count: stats.guests },
@@ -118,28 +193,12 @@ function EventDetail() {
 
   function performToggle() {
     if (!confirmAction) return;
-    const { attendee, kind } = confirmAction;
-    const stamp = nowStamp();
-    setAttendees((current) =>
-      current.map((item) =>
-        item.id === attendee.id
-          ? { ...item, ...(kind === "entrada" ? { llegada: stamp } : { salida: stamp }) }
-          : item,
-      ),
-    );
-    if (kind === "entrada") {
-      setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
-      setBadgeOpen(true);
-      toast.success(`Entrada registrada: ${attendee.nombre}`);
+    if (confirmAction.kind === "entrada") {
+      checkIn.mutate(confirmAction.attendee);
     } else {
-      toast.success(`Salida registrada: ${attendee.nombre}`);
+      checkOut.mutate(confirmAction.attendee);
     }
     setConfirmAction(null);
-  }
-
-  function removeAttendee(id: string) {
-    setAttendees((current) => current.filter((item) => item.id !== id));
-    toast.success("Registro eliminado");
   }
 
   function setVisitorField(key: keyof typeof visitorForm, value: string) {
@@ -155,33 +214,7 @@ function EventDetail() {
       toast.error("El nombre es obligatorio");
       return;
     }
-
-    const id = `walk-${Date.now().toString(36)}`;
-    const next: Guest = {
-      id,
-      eventoId: currentEvent.id,
-      nombre: visitorForm.nombre.trim(),
-      cedula: visitorForm.cedula.trim() || "Sin documento",
-      cargo: visitorForm.cargo.trim() || "Visitante",
-      institucion: visitorForm.institucion.trim() || "No especificada",
-      correo: visitorForm.correo.trim() || "-",
-      tipo: "Protocolo",
-      confirmacion: "aceptado",
-      llegada: nowStamp(),
-    };
-
-    setAttendees((current) => [next, ...current]);
-    setVisitorOpen(false);
-    setVisitorForm({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
-    setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: currentEvent.nombre, tipo: "Visitante" });
-    setBadgeOpen(true);
-    toast.success(`Visitante registrado: ${next.nombre}`);
-  }
-
-  function finalizeEvent() {
-    setFinalized(true);
-    setFinalizeOpen(false);
-    toast.success("Evento finalizado");
+    createWalkIn.mutate();
   }
 
   return (
@@ -198,7 +231,7 @@ function EventDetail() {
             <Button onClick={() => setVisitorOpen(true)} disabled={finalized}>
               <UserPlus className="mr-2 h-4 w-4" /> Registrar visitante
             </Button>
-            <Button variant="outline" onClick={() => toast("Importacion CSV simulada")} disabled={finalized}>
+            <Button variant="outline" onClick={() => toast("Importacion CSV pendiente")} disabled={finalized}>
               <Upload className="mr-2 h-4 w-4" /> Importar lista
             </Button>
             {finalized ? (
@@ -260,13 +293,15 @@ function EventDetail() {
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre, cedula..." className="pl-9" />
+          <Input value={query} onChange={(inputEvent) => setQuery(inputEvent.target.value)} placeholder="Buscar por nombre, cedula..." className="pl-9" />
         </div>
       </div>
 
       <Card className="overflow-hidden border-t-2 border-t-primary">
-        {filtered.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">No hay asistentes que coincidan.</div>
+        {attendeesQuery.isLoading || filtered.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            {attendeesQuery.isLoading ? "Cargando asistentes..." : "No hay asistentes que coincidan."}
+          </div>
         ) : (
           <div className="overflow-x-auto p-4 sm:p-5">
             <Table>
@@ -323,13 +358,13 @@ function EventDetail() {
                       </TableCell>
                       <TableCell>
                         {attendee.llegada
-                          ? <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle2 className="h-4 w-4" /> {attendee.llegada.slice(11)}</span>
+                          ? <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle2 className="h-4 w-4" /> {displayTime(attendee.llegada)}</span>
                           : <span className="text-muted-foreground">Sin registrar</span>}
                       </TableCell>
                       <TableCell>
                         {attendee.salida
-                          ? <span className="inline-flex items-center gap-1.5 text-destructive"><LogOut className="h-4 w-4" /> {attendee.salida.slice(11)}</span>
-                          : <span className="text-muted-foreground">—</span>}
+                          ? <span className="inline-flex items-center gap-1.5 text-destructive"><LogOut className="h-4 w-4" /> {displayTime(attendee.salida)}</span>
+                          : <span className="text-muted-foreground">-</span>}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -338,13 +373,13 @@ function EventDetail() {
                             size="icon"
                             aria-label={`Etiqueta ${attendee.nombre}`}
                             onClick={() => {
-                              setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
+                              setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event.nombre, tipo: attendee.tipo });
                               setBadgeOpen(true);
                             }}
                           >
                             <Printer className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${attendee.nombre}`} onClick={() => removeAttendee(attendee.id)} disabled={finalized}>
+                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${attendee.nombre}`} onClick={() => removeGuest.mutate(attendee.id)} disabled={finalized}>
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </div>
@@ -367,28 +402,30 @@ function EventDetail() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label>Nombre completo</Label>
-              <Input value={visitorForm.nombre} onChange={(event) => setVisitorField("nombre", event.target.value)} className="mt-1.5" autoFocus />
+              <Input value={visitorForm.nombre} onChange={(inputEvent) => setVisitorField("nombre", inputEvent.target.value)} className="mt-1.5" autoFocus />
             </div>
             <div>
               <Label>Cedula / Documento</Label>
-              <Input value={visitorForm.cedula} onChange={(event) => setVisitorField("cedula", event.target.value)} className="mt-1.5" />
+              <Input value={visitorForm.cedula} onChange={(inputEvent) => setVisitorField("cedula", inputEvent.target.value)} className="mt-1.5" />
             </div>
             <div>
               <Label>Cargo</Label>
-              <Input value={visitorForm.cargo} onChange={(event) => setVisitorField("cargo", event.target.value)} className="mt-1.5" />
+              <Input value={visitorForm.cargo} onChange={(inputEvent) => setVisitorField("cargo", inputEvent.target.value)} className="mt-1.5" />
             </div>
             <div>
               <Label>Institucion</Label>
-              <Input value={visitorForm.institucion} onChange={(event) => setVisitorField("institucion", event.target.value)} className="mt-1.5" />
+              <Input value={visitorForm.institucion} onChange={(inputEvent) => setVisitorField("institucion", inputEvent.target.value)} className="mt-1.5" />
             </div>
             <div>
               <Label>Correo</Label>
-              <Input value={visitorForm.correo} onChange={(event) => setVisitorField("correo", event.target.value)} className="mt-1.5" />
+              <Input value={visitorForm.correo} onChange={(inputEvent) => setVisitorField("correo", inputEvent.target.value)} className="mt-1.5" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setVisitorOpen(false)}>Cancelar</Button>
-            <Button className="bg-accent text-accent-foreground hover:opacity-90" onClick={registerWalkIn}>Registrar llegada y etiqueta</Button>
+            <Button className="bg-accent text-accent-foreground hover:opacity-90" onClick={registerWalkIn} disabled={createWalkIn.isPending}>
+              Registrar llegada y etiqueta
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -422,6 +459,7 @@ function EventDetail() {
             <Button
               className={confirmAction?.kind === "salida" ? "bg-destructive text-destructive-foreground hover:opacity-90" : ""}
               onClick={performToggle}
+              disabled={checkIn.isPending || checkOut.isPending}
             >
               Confirmar {confirmAction?.kind}
             </Button>
@@ -439,7 +477,7 @@ function EventDetail() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFinalizeOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={finalizeEvent}>
+            <Button variant="destructive" onClick={() => finalizeEvent.mutate()} disabled={finalizeEvent.isPending}>
               <Lock className="mr-2 h-4 w-4" /> Finalizar
             </Button>
           </DialogFooter>
