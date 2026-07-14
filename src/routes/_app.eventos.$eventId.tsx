@@ -5,7 +5,9 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Lock,
   LogIn,
+  LogOut,
   MapPin,
   Printer,
   Search,
@@ -21,7 +23,7 @@ import { StatCard } from "@/components/common/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,11 +31,16 @@ import { events, guests, type Guest } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 type FilterTab = "all" | "guest" | "visitor" | "pending";
+type ConfirmAction = { attendee: Guest; kind: "entrada" | "salida" };
 
 export const Route = createFileRoute("/_app/eventos/$eventId")({
   head: () => ({ meta: [{ title: "Detalle de evento - G-Visitantes" }] }),
   component: EventDetail,
 });
+
+function nowStamp() {
+  return new Date().toISOString().slice(0, 16).replace("T", " ");
+}
 
 function EventDetail() {
   const { eventId } = Route.useParams();
@@ -45,6 +52,9 @@ function EventDetail() {
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [badge, setBadge] = useState<BadgeData | null>(null);
   const [visitorForm, setVisitorForm] = useState({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
+  const [finalized, setFinalized] = useState(event?.estado === "finalizado");
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   const stats = useMemo(() => ({
     total: attendees.length,
@@ -94,14 +104,37 @@ function EventDetail() {
     { key: "pending", label: "Pendientes", count: stats.pending },
   ];
 
-  function toggleArrival(attendee: Guest) {
-    const nextArrival = attendee.llegada ? undefined : new Date().toISOString().slice(0, 16).replace("T", " ");
-    setAttendees((current) => current.map((item) => item.id === attendee.id ? { ...item, llegada: nextArrival } : item));
-    if (nextArrival) {
+  function requestToggle(attendee: Guest) {
+    if (finalized) {
+      toast.error("El evento está finalizado. No se pueden registrar movimientos.");
+      return;
+    }
+    if (attendee.llegada && attendee.salida) {
+      toast("Este invitado ya registró entrada y salida.");
+      return;
+    }
+    setConfirmAction({ attendee, kind: attendee.llegada ? "salida" : "entrada" });
+  }
+
+  function performToggle() {
+    if (!confirmAction) return;
+    const { attendee, kind } = confirmAction;
+    const stamp = nowStamp();
+    setAttendees((current) =>
+      current.map((item) =>
+        item.id === attendee.id
+          ? { ...item, ...(kind === "entrada" ? { llegada: stamp } : { salida: stamp }) }
+          : item,
+      ),
+    );
+    if (kind === "entrada") {
       setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
       setBadgeOpen(true);
+      toast.success(`Entrada registrada: ${attendee.nombre}`);
+    } else {
+      toast.success(`Salida registrada: ${attendee.nombre}`);
     }
-    toast.success(nextArrival ? `Llegada registrada: ${attendee.nombre}` : `Llegada retirada: ${attendee.nombre}`);
+    setConfirmAction(null);
   }
 
   function removeAttendee(id: string) {
@@ -114,6 +147,10 @@ function EventDetail() {
   }
 
   function registerWalkIn() {
+    if (finalized) {
+      toast.error("El evento está finalizado.");
+      return;
+    }
     if (!visitorForm.nombre.trim()) {
       toast.error("El nombre es obligatorio");
       return;
@@ -130,7 +167,7 @@ function EventDetail() {
       correo: visitorForm.correo.trim() || "-",
       tipo: "Protocolo",
       confirmacion: "aceptado",
-      llegada: new Date().toISOString().slice(0, 16).replace("T", " "),
+      llegada: nowStamp(),
     };
 
     setAttendees((current) => [next, ...current]);
@@ -139,6 +176,12 @@ function EventDetail() {
     setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: currentEvent.nombre, tipo: "Visitante" });
     setBadgeOpen(true);
     toast.success(`Visitante registrado: ${next.nombre}`);
+  }
+
+  function finalizeEvent() {
+    setFinalized(true);
+    setFinalizeOpen(false);
+    toast.success("Evento finalizado");
   }
 
   return (
@@ -152,8 +195,21 @@ function EventDetail() {
         subtitle="Gestiona la lista de invitados, visitantes y registro de llegada."
         actions={
           <>
-            <Button onClick={() => setVisitorOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Registrar visitante</Button>
-            <Button variant="outline" onClick={() => toast("Importacion CSV simulada")}><Upload className="mr-2 h-4 w-4" /> Importar lista</Button>
+            <Button onClick={() => setVisitorOpen(true)} disabled={finalized}>
+              <UserPlus className="mr-2 h-4 w-4" /> Registrar visitante
+            </Button>
+            <Button variant="outline" onClick={() => toast("Importacion CSV simulada")} disabled={finalized}>
+              <Upload className="mr-2 h-4 w-4" /> Importar lista
+            </Button>
+            {finalized ? (
+              <Button variant="outline" disabled>
+                <Lock className="mr-2 h-4 w-4" /> Evento finalizado
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={() => setFinalizeOpen(true)}>
+                <Lock className="mr-2 h-4 w-4" /> Finalizar evento
+              </Button>
+            )}
           </>
         }
       />
@@ -170,7 +226,11 @@ function EventDetail() {
             </span>
           )}
           <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" /> {event.lugar}</span>
-          <Badge className="bg-success/15 text-success hover:bg-success/15">{event.estado}</Badge>
+          {finalized ? (
+            <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/15">finalizado</Badge>
+          ) : (
+            <Badge className="bg-success/15 text-success hover:bg-success/15">{event.estado}</Badge>
+          )}
         </div>
       </Card>
 
@@ -212,67 +272,86 @@ function EventDetail() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Llegada</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Contacto</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Hora de registro</TableHead>
+                  <TableHead>Entrada</TableHead>
+                  <TableHead>Salida</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((attendee) => (
-                  <TableRow key={attendee.id}>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => toggleArrival(attendee)}
-                        className={`grid h-8 w-8 place-items-center rounded-full border transition-colors ${
-                          attendee.llegada
-                            ? "border-success/30 bg-success/15 text-success"
-                            : "border-border bg-card text-muted-foreground hover:bg-muted"
-                        }`}
-                        aria-label={`Marcar llegada de ${attendee.nombre}`}
-                      >
-                        <LogIn className="h-4 w-4" />
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{attendee.nombre}</div>
-                      <div className="text-xs text-muted-foreground">{attendee.institucion}</div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <div>{attendee.correo}</div>
-                      <div className="text-xs">{attendee.cedula}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={attendee.tipo === "VIP" ? "border-accent/40 bg-accent/10 text-accent" : ""}>{attendee.tipo}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {attendee.llegada
-                        ? <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle2 className="h-4 w-4" /> {attendee.llegada.slice(11)}</span>
-                        : <span className="text-muted-foreground">Sin registrar</span>}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Etiqueta ${attendee.nombre}`}
-                          onClick={() => {
-                            setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
-                            setBadgeOpen(true);
-                          }}
+                {filtered.map((attendee) => {
+                  const hasEntry = !!attendee.llegada;
+                  const hasExit = !!attendee.salida;
+                  const btnClass = hasExit
+                    ? "border-destructive/30 bg-destructive/15 text-destructive"
+                    : hasEntry
+                      ? "border-success/30 bg-success/15 text-success"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted";
+                  const btnIcon = hasEntry && !hasExit ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />;
+                  const btnLabel = hasExit
+                    ? `${attendee.nombre} ya registró salida`
+                    : hasEntry
+                      ? `Registrar salida de ${attendee.nombre}`
+                      : `Registrar entrada de ${attendee.nombre}`;
+                  return (
+                    <TableRow key={attendee.id}>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => requestToggle(attendee)}
+                          disabled={finalized || (hasEntry && hasExit)}
+                          className={`grid h-8 w-8 place-items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${btnClass}`}
+                          aria-label={btnLabel}
+                          title={btnLabel}
                         >
-                          <Printer className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" aria-label={`Eliminar ${attendee.nombre}`} onClick={() => removeAttendee(attendee.id)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {btnIcon}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-foreground">{attendee.nombre}</div>
+                        <div className="text-xs text-muted-foreground">{attendee.institucion}</div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        <div>{attendee.correo}</div>
+                        <div className="text-xs">{attendee.cedula}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={attendee.tipo === "VIP" ? "border-accent/40 bg-accent/10 text-accent" : ""}>{attendee.tipo}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {attendee.llegada
+                          ? <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle2 className="h-4 w-4" /> {attendee.llegada.slice(11)}</span>
+                          : <span className="text-muted-foreground">Sin registrar</span>}
+                      </TableCell>
+                      <TableCell>
+                        {attendee.salida
+                          ? <span className="inline-flex items-center gap-1.5 text-destructive"><LogOut className="h-4 w-4" /> {attendee.salida.slice(11)}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Etiqueta ${attendee.nombre}`}
+                            onClick={() => {
+                              setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: currentEvent.nombre, tipo: attendee.tipo });
+                              setBadgeOpen(true);
+                            }}
+                          >
+                            <Printer className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${attendee.nombre}`} onClick={() => removeAttendee(attendee.id)} disabled={finalized}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -313,6 +392,60 @@ function EventDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Confirmar {confirmAction?.kind === "entrada" ? "entrada" : "salida"}
+            </DialogTitle>
+            <DialogDescription>
+              ¿Está seguro de registrar la {confirmAction?.kind} del siguiente invitado?
+            </DialogDescription>
+          </DialogHeader>
+          {confirmAction && (
+            <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div className="text-base font-semibold text-foreground">{confirmAction.attendee.nombre}</div>
+              <div className="mt-1 text-muted-foreground">{confirmAction.attendee.cargo} · {confirmAction.attendee.institucion}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <div><span className="font-medium text-foreground">Cédula:</span> {confirmAction.attendee.cedula}</div>
+                <div><span className="font-medium text-foreground">Tipo:</span> {confirmAction.attendee.tipo}</div>
+                <div className="col-span-2"><span className="font-medium text-foreground">Correo:</span> {confirmAction.attendee.correo}</div>
+                {confirmAction.attendee.llegada && (
+                  <div className="col-span-2"><span className="font-medium text-foreground">Entrada:</span> {confirmAction.attendee.llegada}</div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancelar</Button>
+            <Button
+              className={confirmAction?.kind === "salida" ? "bg-destructive text-destructive-foreground hover:opacity-90" : ""}
+              onClick={performToggle}
+            >
+              Confirmar {confirmAction?.kind}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Finalizar evento</DialogTitle>
+            <DialogDescription>
+              Una vez finalizado no se podrán registrar entradas ni salidas, ni agregar nuevos invitados. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFinalizeOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={finalizeEvent}>
+              <Lock className="mr-2 h-4 w-4" /> Finalizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BadgePrintModal open={badgeOpen} onOpenChange={setBadgeOpen} data={badge} />
     </div>
   );
