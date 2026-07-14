@@ -45,6 +45,7 @@ export type Guest = {
   tipo: GuestType;
   confirmacion: GuestConfirmation;
   llegada?: string;
+  salida?: string;
 };
 
 export const visitors: Visitor[] = [
