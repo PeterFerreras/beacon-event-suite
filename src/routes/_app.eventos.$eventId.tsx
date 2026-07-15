@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Html5Qrcode } from "html5-qrcode";
 import {
   ArrowLeft,
   CalendarDays,
@@ -53,6 +54,8 @@ function EventDetail() {
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [badge, setBadge] = useState<BadgeData | null>(null);
   const [visitorForm, setVisitorForm] = useState({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [buscandoPadron, setBuscandoPadron] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
@@ -127,7 +130,58 @@ function EventDetail() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo finalizar el evento"),
   });
+useEffect(() => {
+  if (!scannerOpen) return;
 
+  let scanner: Html5Qrcode | null = null;
+
+  const iniciar = async () => {
+    try {
+      scanner = new Html5Qrcode("lector-qr");
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: 250,
+        },
+        async (qrText) => {
+          try {
+            await scanner?.stop();
+
+            const persona = procesarQrCedula(qrText);
+
+            setVisitorForm((actual) => ({
+              ...actual,
+              cedula: persona.cedula,
+              nombre: persona.nombre,
+            }));
+
+            toast.success("Cédula escaneada correctamente");
+            setScannerOpen(false);
+
+          } catch {
+            toast.error("QR de cédula inválido");
+          }
+        },
+        () => {}
+      );
+
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo iniciar la cámara");
+      setScannerOpen(false);
+    }
+  };
+
+  const timer = setTimeout(iniciar, 200);
+
+  return () => {
+    clearTimeout(timer);
+    scanner?.stop().catch(() => {});
+  };
+
+}, [scannerOpen]);
   const stats = useMemo(() => ({
     total: attendees.length,
     guests: attendees.filter((item) => item.tipo !== "Protocolo").length,
@@ -204,6 +258,60 @@ function EventDetail() {
   function setVisitorField(key: keyof typeof visitorForm, value: string) {
     setVisitorForm((current) => ({ ...current, [key]: value }));
   }
+async function consultarCedula() {
+  if (!visitorForm.cedula.trim()) {
+    toast.error("Ingrese una cédula");
+    return;
+  }
+
+  try {
+    setBuscandoPadron(true);
+
+    const persona = await apiClient.padronBuscar(visitorForm.cedula);
+
+    setVisitorForm((current) => ({
+      ...current,
+      nombre: persona.nombre || current.nombre,
+    }));
+
+    toast.success("Datos cargados desde el padrón");
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "No se encontró la cédula en el padrón"
+    );
+  } finally {
+    setBuscandoPadron(false);
+  }
+}
+
+function procesarQrCedula(qrText: string) {
+  const partes = qrText.split("/");
+
+  if (partes.length < 4) {
+    throw new Error("QR inválido");
+  }
+
+  return {
+    cedula: partes[0].trim(),
+    nombre: [
+      partes[1],
+      partes[2],
+      partes[3],
+    ]
+      .filter(Boolean)
+      .map(
+        (texto) =>
+          texto.charAt(0).toUpperCase() +
+          texto.slice(1).toLowerCase()
+      )
+      .join(" "),
+  };
+}
+function escanearCedula() {
+  setScannerOpen(true);
+}
 
   function registerWalkIn() {
     if (finalized) {
@@ -401,13 +509,56 @@ function EventDetail() {
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
+  <Button
+    type="button"
+    variant="outline"
+    onClick={escanearCedula}
+  >
+    Escanear cédula
+  </Button>
+  {scannerOpen && (
+  <div className="mt-4">
+    <div
+      id="lector-qr"
+      className="overflow-hidden rounded-lg border"
+    />
+    
+    <Button
+      type="button"
+      variant="outline"
+      className="mt-3"
+      onClick={() => setScannerOpen(false)}
+    >
+      Cancelar escaneo
+    </Button>
+  </div>
+)}
+</div>
+            <div className="sm:col-span-2">
               <Label>Nombre completo</Label>
               <Input value={visitorForm.nombre} onChange={(inputEvent) => setVisitorField("nombre", inputEvent.target.value)} className="mt-1.5" autoFocus />
             </div>
             <div>
-              <Label>Cedula / Documento</Label>
-              <Input value={visitorForm.cedula} onChange={(inputEvent) => setVisitorField("cedula", inputEvent.target.value)} className="mt-1.5" />
-            </div>
+  <Label>Cedula / Documento</Label>
+
+  <div className="mt-1.5 flex gap-2">
+    <Input
+      value={visitorForm.cedula}
+      onChange={(inputEvent) =>
+        setVisitorField("cedula", inputEvent.target.value)
+      }
+    />
+
+    <Button
+      type="button"
+      variant="outline"
+      onClick={consultarCedula}
+      disabled={buscandoPadron}
+    >
+      <Search className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
             <div>
               <Label>Cargo</Label>
               <Input value={visitorForm.cargo} onChange={(inputEvent) => setVisitorField("cargo", inputEvent.target.value)} className="mt-1.5" />

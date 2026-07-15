@@ -9,7 +9,7 @@ export type DashboardStats = { visitantesHoy: number; eventosActivos: number; in
 export type NewEventPayload = { nombre: string; descripcion?: string; lugar?: string; fecha: string; fechaFin?: string; inicio?: string | null; fin?: string | null; estado?: EventStatus; requiereConfirmacion?: boolean };
 export type UpdateEventPayload = Partial<Pick<EventItem, "nombre" | "descripcion" | "lugar" | "estado" | "requiereConfirmacion">> & { fechaInicio?: string; fechaFin?: string };
 export type VisitorPayload = { cedula: string; nombre: string; cargo: string; institucion: string; area: string; telefono: string; correo: string; motivo: string; acompanantes?: { nombre: string; cedula: string }[] };
-
+export type PadronPersona = { cedula: string; nombre: string; foto?: string | null; estado?: string | null; provincia?: string | null; municipio?: string | null; fechaNacimiento?: string | null; edad?: number | null; sexo?: string | null; nacionalidad?: string | null; fuente?: string };
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8080/api").replace(/\/$/, "");
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -19,6 +19,12 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!response.ok) throw new Error(data?.detail || data?.error || "No se pudo completar la solicitud.");
   return data as T;
 }
+
+// URL absoluta a la foto del padron, servida por el backend. Uso directo en <img src>.
+export const padronFotoUrl = (cedula: string) => {
+  const clean = (cedula ?? "").replace(/\D/g, "");
+  return clean.length === 11 ? `${API_URL}/padron/foto?cedula=${clean}` : "";
+};
 
 export const apiClient = {
   dashboard: () => api<DashboardStats>("/dashboard"),
@@ -42,4 +48,7 @@ export const apiClient = {
   guestTypes: () => api<{ id: string; nombre: string; color?: string }[]>("/guest-types"),
   createGuestType: (nombre: string) => api<{ id: string; nombre: string }>("/guest-types", { method: "POST", body: JSON.stringify({ nombre }) }),
   report: (tipo: string, eventoId?: string) => api<{ tipo: string; items: unknown[] }>(`/reports/${tipo}${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ""}`),
+  // Padron
+  padronBuscar: (cedula: string) => api<PadronPersona>(`/padron/buscar?cedula=${encodeURIComponent(cedula.replace(/\D/g, ""))}`),
+  padronFotoUrl,
 };

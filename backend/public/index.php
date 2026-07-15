@@ -15,13 +15,14 @@ if ($method === 'GET' && $path === '/api/health') { Response::json(['ok'=>true,'
 
 require __DIR__ . '/../src/Database.php';
 require __DIR__ . '/../src/Transformers.php';
+require __DIR__ . '/../src/padron.php';
 try { $db = new Database($config['database']); }
 catch (Throwable $e) { Response::error('No se pudo conectar a MySQL', 500, ['detail'=>$config['debug'] ? $e->getMessage() : null]); exit; }
 
 try { route($method, $path, $db); }
 catch (Throwable $e) { Response::error('Error interno del servidor', 500, ['detail'=>$config['debug'] ? $e->getMessage() : null]); }
 
-function route(string $method, string $path, Database $db): void {
+function route(string $method, string $path, Database $db): void { if (padron_route($method, $path)) return;
     if ($method === 'GET' && $path === '/api/db-health') { $db->one('SELECT 1 ok'); Response::json(['ok'=>true,'database'=>'connected']); return; }
     if ($method === 'GET' && $path === '/api/dashboard') { dashboard($db); return; }
     if ($method === 'GET' && $path === '/api/events') { $rows=$db->all(event_sql().' ORDER BY e.starts_on DESC'); Response::json(array_map(fn($r)=>event_row($r, sessions($db,$r['id'])), $rows)); return; }
