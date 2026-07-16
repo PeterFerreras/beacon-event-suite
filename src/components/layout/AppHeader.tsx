@@ -45,8 +45,8 @@ export function AppHeader() {
             </div>
           </Link>
 
-          <div className="hidden items-center gap-3 lg:flex">
-            <div className="relative">
+          <div className="flex shrink-0 items-center gap-2 lg:gap-3">
+            <div className="relative hidden lg:block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55" />
               <Input
                 placeholder="Buscar visitante o evento..."
@@ -64,7 +64,7 @@ export function AppHeader() {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <div className="grid h-11 w-11 place-items-center rounded-xl border border-brand-yellow/40 bg-white/10 text-xs font-semibold text-brand-yellow">
+            <div className="hidden h-11 w-11 place-items-center rounded-xl border border-brand-yellow/40 bg-white/10 text-xs font-semibold text-brand-yellow sm:grid">
               SDE
             </div>
           </div>

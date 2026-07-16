@@ -13,5 +13,9 @@ php backend\scripts\run-sql.php backend\database\schema.sql
 Servidor local:
 
 ```powershell
-php -S 127.0.0.1:8080 -t backend/public
+php -S 0.0.0.0:8081 -t backend/public
 ```
+
+Con el frontend en modo desarrollo, abre la URL de red que muestra Vite, por ejemplo
+`http://172.16.44.79:8080`. El frontend usa `/api` en el mismo host y Vite reenvia esas
+peticiones al backend PHP en `http://127.0.0.1:8081`.

@@ -42,6 +42,37 @@ function titleCase(value: string) {
   return value.trim().toLocaleLowerCase("es-DO").replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toLocaleUpperCase("es-DO"));
 }
 
+function limpiarNombreQr(value: string) {
+  return value
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu, " ")
+    .split(/[\s\/|;,\t\n]+/)
+    .filter((part) => {
+      const token = part.trim();
+      if (!token) return false;
+      if (!/\p{L}/u.test(token)) return false;
+      if (/^[0-9a-f]{6,}$/iu.test(token)) return false;
+      if (/^(?:id|uuid|codigo|código|token|qr)$/iu.test(token)) return false;
+      if (/^(?=.*\d)(?=.*[a-z])[a-z0-9-]{6,}$/iu.test(token)) return false;
+      return true;
+    })
+    .join(" ");
+}
+
+function nombreDesdeMrz(value: string) {
+  const candidate = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.includes("<<") && /[A-Z]{2,}/i.test(line));
+  if (!candidate) return "";
+
+  return candidate
+    .replace(/^[A-Z]{1,3}/i, "")
+    .split(/<+/)
+    .map((part) => part.trim())
+    .filter((part) => /^[A-ZÁÉÍÓÚÑ\s-]{2,}$/iu.test(part))
+    .join(" ");
+}
+
 export function procesarQrCedula(qrText: string): QrCedulaData {
   const raw = qrText.trim();
   if (!raw) throw new Error("El QR no contiene datos");
@@ -70,13 +101,18 @@ export function procesarQrCedula(qrText: string): QrCedulaData {
     const documentIndex = parts.findIndex((part) => part.replace(/\D/g, "").length === 11);
     if (documentIndex >= 0) {
       cedula = parts[documentIndex];
-      nombres = parts.filter((part, index) => index !== documentIndex && /\p{L}/u.test(part));
+      nombres = [parts.filter((part, index) => index !== documentIndex).join(" ")];
     }
+  }
+
+  if (!cedula) {
+    cedula = raw.match(/(?<!\d)\d{11}(?!\d)/)?.[0] ?? "";
   }
 
   const cleanCedula = cedula.replace(/\D/g, "");
   if (cleanCedula.length !== 11) throw new Error("El QR no contiene una cédula válida de 11 dígitos");
-  return { cedula: cleanCedula, nombre: titleCase(nombres.join(" ")) };
+  const nombre = limpiarNombreQr(nombres.join(" ").replace(cedula, "").replace(cleanCedula, ""));
+  return { cedula: cleanCedula, nombre: nombre ? titleCase(nombre) : "" };
 }
 
 export const Route = createFileRoute("/_app/eventos/$eventId")({
@@ -189,7 +225,7 @@ function EventDetail() {
     const startScanner = async () => {
       try {
         if (!window.isSecureContext) {
-          throw new Error("La cámara solo funciona en una conexión HTTPS o en localhost.");
+          throw new Error("Para usar la cámara desde el teléfono, abre la app con HTTPS. Levanta el frontend con `npm run dev:https` y entra a la URL Network que empieza por https://.");
         }
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error("Este navegador no permite acceder a la cámara.");
@@ -199,8 +235,9 @@ function EventDetail() {
         if (cancelled) return;
         if (!cameras.length) throw new Error("No se encontró ninguna cámara disponible.");
 
+        const macroCamera = cameras.find((camera) => /macro|close|near|super\s*macro/i.test(camera.label));
         const backCamera = cameras.find((camera) => /back|rear|environment|trasera/i.test(camera.label));
-        const cameraId = (backCamera ?? cameras[cameras.length - 1]).id;
+        const cameraId = (macroCamera ?? backCamera ?? cameras[cameras.length - 1]).id;
         scanner = new Html5Qrcode(QR_READER_ID, {
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
           verbose: false,
@@ -596,6 +633,11 @@ function escanearCedula() {
       id={QR_READER_ID}
       className={scannerError ? "hidden" : "min-h-64 overflow-hidden rounded-lg border bg-black"}
     />
+    {!scannerError && (
+      <p className="mt-2 text-xs text-muted-foreground">
+        Alinee el QR de la cédula dentro del recuadro. Si no enfoca, aleje un poco el documento y mejore la luz.
+      </p>
+    )}
     
     <Button
       type="button"
