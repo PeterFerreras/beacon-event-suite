@@ -99,6 +99,8 @@ function EventDetail() {
   const [badge, setBadge] = useState<BadgeData | null>(null);
   const [visitorForm, setVisitorForm] = useState({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const [scannerStarting, setScannerStarting] = useState(false);
   const [buscandoPadron, setBuscandoPadron] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
@@ -179,16 +181,33 @@ function EventDetail() {
     if (!scannerOpen) return;
 
     let cancelled = false;
-    const scanner = new Html5Qrcode(QR_READER_ID, {
-      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-      verbose: false,
-    });
+    let scanner: Html5Qrcode | null = null;
     scanHandledRef.current = false;
+    setScannerError("");
+    setScannerStarting(true);
 
     const startScanner = async () => {
       try {
+        if (!window.isSecureContext) {
+          throw new Error("La cámara solo funciona en una conexión HTTPS o en localhost.");
+        }
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Este navegador no permite acceder a la cámara.");
+        }
+
+        const cameras = await Html5Qrcode.getCameras();
+        if (cancelled) return;
+        if (!cameras.length) throw new Error("No se encontró ninguna cámara disponible.");
+
+        const backCamera = cameras.find((camera) => /back|rear|environment|trasera/i.test(camera.label));
+        const cameraId = (backCamera ?? cameras[cameras.length - 1]).id;
+        scanner = new Html5Qrcode(QR_READER_ID, {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
+
         await scanner.start(
-          { facingMode: { ideal: "environment" } },
+          cameraId,
           { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
           async (qrText) => {
             if (cancelled || scanHandledRef.current) return;
@@ -218,19 +237,30 @@ function EventDetail() {
           },
           () => undefined,
         );
+        if (cancelled && scanner.isScanning) await scanner.stop();
+        if (!cancelled) setScannerStarting(false);
       } catch (error) {
         if (cancelled) return;
         console.error(error);
-        const insecure = window.location.protocol !== "https:" && window.location.hostname !== "localhost";
-        toast.error(insecure ? "La cámara requiere HTTPS o localhost." : "No se pudo iniciar la cámara. Revise el permiso del navegador.");
-        setScannerOpen(false);
+        const rawMessage = error instanceof Error ? error.message : String(error);
+        const message = /NotAllowed|Permission|denied|permiso/i.test(rawMessage)
+          ? "Permiso de cámara rechazado. Habilítelo en la configuración del navegador y vuelva a intentar."
+          : /NotFound|DevicesNotFound/i.test(rawMessage)
+            ? "No se encontró una cámara en este dispositivo."
+            : rawMessage || "No se pudo iniciar la cámara.";
+        setScannerStarting(false);
+        setScannerError(message);
+        toast.error(message);
       }
     };
 
-    void startScanner();
+    // Espera a que Radix Dialog termine de montar el contenedor. También evita
+    // el doble arranque que React StrictMode ejecuta durante el desarrollo.
+    const timer = window.setTimeout(() => void startScanner(), 200);
     return () => {
       cancelled = true;
-      if (scanner.isScanning) void scanner.stop().catch(() => undefined);
+      window.clearTimeout(timer);
+      if (scanner?.isScanning) void scanner.stop().catch(() => undefined);
     };
   }, [scannerOpen]);
   const stats = useMemo(() => ({
@@ -338,6 +368,7 @@ async function consultarCedula() {
 }
 
 function escanearCedula() {
+  setScannerError("");
   setScannerOpen(true);
 }
 
@@ -529,7 +560,10 @@ function escanearCedula() {
         )}
       </Card>
 
-      <Dialog open={visitorOpen} onOpenChange={setVisitorOpen}>
+      <Dialog open={visitorOpen} onOpenChange={(open) => {
+        setVisitorOpen(open);
+        if (!open) setScannerOpen(false);
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Registrar visitante al evento</DialogTitle>
@@ -546,9 +580,21 @@ function escanearCedula() {
   </Button>
   {scannerOpen && (
   <div className="mt-4">
+    {scannerStarting && <p className="mb-2 text-sm text-muted-foreground">Solicitando acceso a la cámara…</p>}
+    {scannerError && (
+      <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <p>{scannerError}</p>
+        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => {
+          setScannerOpen(false);
+          window.setTimeout(() => setScannerOpen(true), 0);
+        }}>
+          Reintentar
+        </Button>
+      </div>
+    )}
     <div
       id={QR_READER_ID}
-      className="min-h-64 overflow-hidden rounded-lg border bg-black"
+      className={scannerError ? "hidden" : "min-h-64 overflow-hidden rounded-lg border bg-black"}
     />
     
     <Button
