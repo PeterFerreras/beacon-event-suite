@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
   ArrowLeft,
   CalendarDays,
@@ -34,6 +34,50 @@ import { toast } from "sonner";
 
 type FilterTab = "all" | "guest" | "visitor" | "pending";
 type ConfirmAction = { attendee: Guest; kind: "entrada" | "salida" };
+type QrCedulaData = { cedula: string; nombre: string };
+
+const QR_READER_ID = "lector-qr-cedula";
+
+function titleCase(value: string) {
+  return value.trim().toLocaleLowerCase("es-DO").replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toLocaleUpperCase("es-DO"));
+}
+
+export function procesarQrCedula(qrText: string): QrCedulaData {
+  const raw = qrText.trim();
+  if (!raw) throw new Error("El QR no contiene datos");
+
+  let cedula = "";
+  let nombres: string[] = [];
+
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    cedula = String(data.cedula ?? data.documento ?? data.document_id ?? "");
+    nombres = [data.nombre, data.nombres, data.apellido, data.apellidos]
+      .filter((value): value is string => typeof value === "string" && !!value.trim());
+  } catch { /* El QR no usa JSON. */ }
+
+  if (!cedula) {
+    try {
+      const url = new URL(raw);
+      cedula = url.searchParams.get("cedula") ?? url.searchParams.get("documento") ?? "";
+      nombres = [url.searchParams.get("nombre"), url.searchParams.get("nombres"), url.searchParams.get("apellido"), url.searchParams.get("apellidos")]
+        .filter((value): value is string => !!value?.trim());
+    } catch { /* El QR no usa una URL. */ }
+  }
+
+  if (!cedula) {
+    const parts = raw.split(/[\/|;,\t\n]+/).map((part) => part.trim()).filter(Boolean);
+    const documentIndex = parts.findIndex((part) => part.replace(/\D/g, "").length === 11);
+    if (documentIndex >= 0) {
+      cedula = parts[documentIndex];
+      nombres = parts.filter((part, index) => index !== documentIndex && /\p{L}/u.test(part));
+    }
+  }
+
+  const cleanCedula = cedula.replace(/\D/g, "");
+  if (cleanCedula.length !== 11) throw new Error("El QR no contiene una cédula válida de 11 dígitos");
+  return { cedula: cleanCedula, nombre: titleCase(nombres.join(" ")) };
+}
 
 export const Route = createFileRoute("/_app/eventos/$eventId")({
   head: () => ({ meta: [{ title: "Detalle de evento - G-Visitantes" }] }),
@@ -58,6 +102,7 @@ function EventDetail() {
   const [buscandoPadron, setBuscandoPadron] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const scanHandledRef = useRef(false);
 
   const eventQuery = useQuery({
     queryKey: ["event", eventId],
@@ -130,58 +175,64 @@ function EventDetail() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo finalizar el evento"),
   });
-useEffect(() => {
-  if (!scannerOpen) return;
+  useEffect(() => {
+    if (!scannerOpen) return;
 
-  let scanner: Html5Qrcode | null = null;
+    let cancelled = false;
+    const scanner = new Html5Qrcode(QR_READER_ID, {
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      verbose: false,
+    });
+    scanHandledRef.current = false;
 
-  const iniciar = async () => {
-    try {
-      scanner = new Html5Qrcode("lector-qr");
+    const startScanner = async () => {
+      try {
+        await scanner.start(
+          { facingMode: { ideal: "environment" } },
+          { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
+          async (qrText) => {
+            if (cancelled || scanHandledRef.current) return;
 
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: 250,
-        },
-        async (qrText) => {
-          try {
-            await scanner?.stop();
+            let persona: QrCedulaData;
+            try {
+              persona = procesarQrCedula(qrText);
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "QR de cédula inválido");
+              return;
+            }
 
-            const persona = procesarQrCedula(qrText);
+            scanHandledRef.current = true;
+            setVisitorForm((current) => ({ ...current, cedula: persona.cedula, nombre: persona.nombre || current.nombre }));
 
-            setVisitorForm((actual) => ({
-              ...actual,
-              cedula: persona.cedula,
-              nombre: persona.nombre,
-            }));
+            if (!persona.nombre) {
+              try {
+                const padron = await apiClient.padronBuscar(persona.cedula);
+                if (!cancelled) setVisitorForm((current) => ({ ...current, nombre: padron.nombre || current.nombre }));
+              } catch {
+                toast.info("Cédula leída. Complete el nombre manualmente.");
+              }
+            }
 
             toast.success("Cédula escaneada correctamente");
             setScannerOpen(false);
+          },
+          () => undefined,
+        );
+      } catch (error) {
+        if (cancelled) return;
+        console.error(error);
+        const insecure = window.location.protocol !== "https:" && window.location.hostname !== "localhost";
+        toast.error(insecure ? "La cámara requiere HTTPS o localhost." : "No se pudo iniciar la cámara. Revise el permiso del navegador.");
+        setScannerOpen(false);
+      }
+    };
 
-          } catch {
-            toast.error("QR de cédula inválido");
-          }
-        },
-        () => {}
-      );
-
-    } catch (error) {
-      console.error(error);
-      toast.error("No se pudo iniciar la cámara");
-      setScannerOpen(false);
-    }
-  };
-
-  const timer = setTimeout(iniciar, 200);
-
-  return () => {
-    clearTimeout(timer);
-    scanner?.stop().catch(() => {});
-  };
-
-}, [scannerOpen]);
+    void startScanner();
+    return () => {
+      cancelled = true;
+      if (scanner.isScanning) void scanner.stop().catch(() => undefined);
+    };
+  }, [scannerOpen]);
   const stats = useMemo(() => ({
     total: attendees.length,
     guests: attendees.filter((item) => item.tipo !== "Protocolo").length,
@@ -286,29 +337,6 @@ async function consultarCedula() {
   }
 }
 
-function procesarQrCedula(qrText: string) {
-  const partes = qrText.split("/");
-
-  if (partes.length < 4) {
-    throw new Error("QR inválido");
-  }
-
-  return {
-    cedula: partes[0].trim(),
-    nombre: [
-      partes[1],
-      partes[2],
-      partes[3],
-    ]
-      .filter(Boolean)
-      .map(
-        (texto) =>
-          texto.charAt(0).toUpperCase() +
-          texto.slice(1).toLowerCase()
-      )
-      .join(" "),
-  };
-}
 function escanearCedula() {
   setScannerOpen(true);
 }
@@ -519,8 +547,8 @@ function escanearCedula() {
   {scannerOpen && (
   <div className="mt-4">
     <div
-      id="lector-qr"
-      className="overflow-hidden rounded-lg border"
+      id={QR_READER_ID}
+      className="min-h-64 overflow-hidden rounded-lg border bg-black"
     />
     
     <Button
