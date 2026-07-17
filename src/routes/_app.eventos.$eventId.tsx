@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import {
   ArrowLeft,
   CalendarDays,
@@ -20,101 +19,35 @@ import {
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { CedulaQrScanner, type CedulaQrResult } from "@/components/common/CedulaQrScanner";
 import { BadgePrintModal, type BadgeData } from "@/components/labels/BadgePrintModal";
 import { StatCard } from "@/components/common/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { apiClient, type Guest } from "@/lib/api";
 import { toast } from "sonner";
 
 type FilterTab = "all" | "guest" | "visitor" | "pending";
 type ConfirmAction = { attendee: Guest; kind: "entrada" | "salida" };
-type QrCedulaData = { cedula: string; nombre: string };
-
-const QR_READER_ID = "lector-qr-cedula";
-
-function titleCase(value: string) {
-  return value.trim().toLocaleLowerCase("es-DO").replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toLocaleUpperCase("es-DO"));
-}
-
-function limpiarNombreQr(value: string) {
-  return value
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu, " ")
-    .split(/[\s\/|;,\t\n]+/)
-    .filter((part) => {
-      const token = part.trim();
-      if (!token) return false;
-      if (!/\p{L}/u.test(token)) return false;
-      if (/^[0-9a-f]{6,}$/iu.test(token)) return false;
-      if (/^(?:id|uuid|codigo|código|token|qr)$/iu.test(token)) return false;
-      if (/^(?=.*\d)(?=.*[a-z])[a-z0-9-]{6,}$/iu.test(token)) return false;
-      return true;
-    })
-    .join(" ");
-}
-
-function nombreDesdeMrz(value: string) {
-  const candidate = value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line.includes("<<") && /[A-Z]{2,}/i.test(line));
-  if (!candidate) return "";
-
-  return candidate
-    .replace(/^[A-Z]{1,3}/i, "")
-    .split(/<+/)
-    .map((part) => part.trim())
-    .filter((part) => /^[A-ZÁÉÍÓÚÑ\s-]{2,}$/iu.test(part))
-    .join(" ");
-}
-
-export function procesarQrCedula(qrText: string): QrCedulaData {
-  const raw = qrText.trim();
-  if (!raw) throw new Error("El QR no contiene datos");
-
-  let cedula = "";
-  let nombres: string[] = [];
-
-  try {
-    const data = JSON.parse(raw) as Record<string, unknown>;
-    cedula = String(data.cedula ?? data.documento ?? data.document_id ?? "");
-    nombres = [data.nombre, data.nombres, data.apellido, data.apellidos]
-      .filter((value): value is string => typeof value === "string" && !!value.trim());
-  } catch { /* El QR no usa JSON. */ }
-
-  if (!cedula) {
-    try {
-      const url = new URL(raw);
-      cedula = url.searchParams.get("cedula") ?? url.searchParams.get("documento") ?? "";
-      nombres = [url.searchParams.get("nombre"), url.searchParams.get("nombres"), url.searchParams.get("apellido"), url.searchParams.get("apellidos")]
-        .filter((value): value is string => !!value?.trim());
-    } catch { /* El QR no usa una URL. */ }
-  }
-
-  if (!cedula) {
-    const parts = raw.split(/[\/|;,\t\n]+/).map((part) => part.trim()).filter(Boolean);
-    const documentIndex = parts.findIndex((part) => part.replace(/\D/g, "").length === 11);
-    if (documentIndex >= 0) {
-      cedula = parts[documentIndex];
-      nombres = [parts.filter((part, index) => index !== documentIndex).join(" ")];
-    }
-  }
-
-  if (!cedula) {
-    cedula = raw.match(/(?<!\d)\d{11}(?!\d)/)?.[0] ?? "";
-  }
-
-  const cleanCedula = cedula.replace(/\D/g, "");
-  if (cleanCedula.length !== 11) throw new Error("El QR no contiene una cédula válida de 11 dígitos");
-  const nombre = limpiarNombreQr(nombres.join(" ").replace(cedula, "").replace(cleanCedula, ""));
-  return { cedula: cleanCedula, nombre: nombre ? titleCase(nombre) : "" };
-}
-
 export const Route = createFileRoute("/_app/eventos/$eventId")({
   head: () => ({ meta: [{ title: "Detalle de evento - G-Visitantes" }] }),
   component: EventDetail,
@@ -133,14 +66,16 @@ function EventDetail() {
   const [visitorOpen, setVisitorOpen] = useState(false);
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [badge, setBadge] = useState<BadgeData | null>(null);
-  const [visitorForm, setVisitorForm] = useState({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerError, setScannerError] = useState("");
-  const [scannerStarting, setScannerStarting] = useState(false);
+  const [visitorForm, setVisitorForm] = useState({
+    nombre: "",
+    cedula: "",
+    cargo: "",
+    institucion: "",
+    correo: "",
+  });
   const [buscandoPadron, setBuscandoPadron] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  const scanHandledRef = useRef(false);
 
   const eventQuery = useQuery({
     queryKey: ["event", eventId],
@@ -166,11 +101,19 @@ function EventDetail() {
     mutationFn: (attendee: Guest) => apiClient.checkInGuest(attendee.id),
     onSuccess: (_, attendee) => {
       invalidate();
-      setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event?.nombre, tipo: attendee.tipo });
+      setBadge({
+        id: attendee.id,
+        nombre: attendee.nombre,
+        cargo: attendee.cargo,
+        institucion: attendee.institucion,
+        evento: event?.nombre,
+        tipo: attendee.tipo,
+      });
       setBadgeOpen(true);
       toast.success(`Entrada registrada: ${attendee.nombre}`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar la entrada"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "No se pudo registrar la entrada"),
   });
 
   const checkOut = useMutation({
@@ -179,7 +122,8 @@ function EventDetail() {
       invalidate();
       toast.success(`Salida registrada: ${attendee.nombre}`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar la salida"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "No se pudo registrar la salida"),
   });
 
   const removeGuest = useMutation({
@@ -188,20 +132,29 @@ function EventDetail() {
       invalidate();
       toast.success("Registro eliminado");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo eliminar el registro"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el registro"),
   });
 
   const createWalkIn = useMutation({
-    mutationFn: () => apiClient.createWalkIn(eventId, visitorForm),
+    mutationFn: (payload: typeof visitorForm) => apiClient.createWalkIn(eventId, payload),
     onSuccess: (next) => {
       invalidate();
       setVisitorOpen(false);
       setVisitorForm({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
-      setBadge({ id: next.id, nombre: next.nombre, cargo: next.cargo, institucion: next.institucion, evento: event?.nombre, tipo: "Visitante" });
+      setBadge({
+        id: next.id,
+        nombre: next.nombre,
+        cargo: next.cargo,
+        institucion: next.institucion,
+        evento: event?.nombre,
+        tipo: "Visitante",
+      });
       setBadgeOpen(true);
       toast.success(`Visitante registrado: ${next.nombre}`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo registrar el visitante"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "No se pudo registrar el visitante"),
   });
 
   const finalizeEvent = useMutation({
@@ -211,102 +164,19 @@ function EventDetail() {
       setFinalizeOpen(false);
       toast.success("Evento finalizado");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo finalizar el evento"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "No se pudo finalizar el evento"),
   });
-  useEffect(() => {
-    if (!scannerOpen) return;
-
-    let cancelled = false;
-    let scanner: Html5Qrcode | null = null;
-    scanHandledRef.current = false;
-    setScannerError("");
-    setScannerStarting(true);
-
-    const startScanner = async () => {
-      try {
-        if (!window.isSecureContext) {
-          throw new Error("Para usar la cámara desde el teléfono, abre la app con HTTPS. Levanta el frontend con `npm run dev:https` y entra a la URL Network que empieza por https://.");
-        }
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error("Este navegador no permite acceder a la cámara.");
-        }
-
-        const cameras = await Html5Qrcode.getCameras();
-        if (cancelled) return;
-        if (!cameras.length) throw new Error("No se encontró ninguna cámara disponible.");
-
-        const macroCamera = cameras.find((camera) => /macro|close|near|super\s*macro/i.test(camera.label));
-        const backCamera = cameras.find((camera) => /back|rear|environment|trasera/i.test(camera.label));
-        const cameraId = (macroCamera ?? backCamera ?? cameras[cameras.length - 1]).id;
-        scanner = new Html5Qrcode(QR_READER_ID, {
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-          verbose: false,
-        });
-
-        await scanner.start(
-          cameraId,
-          { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
-          async (qrText) => {
-            if (cancelled || scanHandledRef.current) return;
-
-            let persona: QrCedulaData;
-            try {
-              persona = procesarQrCedula(qrText);
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "QR de cédula inválido");
-              return;
-            }
-
-            scanHandledRef.current = true;
-            setVisitorForm((current) => ({ ...current, cedula: persona.cedula, nombre: persona.nombre || current.nombre }));
-
-            if (!persona.nombre) {
-              try {
-                const padron = await apiClient.padronBuscar(persona.cedula);
-                if (!cancelled) setVisitorForm((current) => ({ ...current, nombre: padron.nombre || current.nombre }));
-              } catch {
-                toast.info("Cédula leída. Complete el nombre manualmente.");
-              }
-            }
-
-            toast.success("Cédula escaneada correctamente");
-            setScannerOpen(false);
-          },
-          () => undefined,
-        );
-        if (cancelled && scanner.isScanning) await scanner.stop();
-        if (!cancelled) setScannerStarting(false);
-      } catch (error) {
-        if (cancelled) return;
-        console.error(error);
-        const rawMessage = error instanceof Error ? error.message : String(error);
-        const message = /NotAllowed|Permission|denied|permiso/i.test(rawMessage)
-          ? "Permiso de cámara rechazado. Habilítelo en la configuración del navegador y vuelva a intentar."
-          : /NotFound|DevicesNotFound/i.test(rawMessage)
-            ? "No se encontró una cámara en este dispositivo."
-            : rawMessage || "No se pudo iniciar la cámara.";
-        setScannerStarting(false);
-        setScannerError(message);
-        toast.error(message);
-      }
-    };
-
-    // Espera a que Radix Dialog termine de montar el contenedor. También evita
-    // el doble arranque que React StrictMode ejecuta durante el desarrollo.
-    const timer = window.setTimeout(() => void startScanner(), 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      if (scanner?.isScanning) void scanner.stop().catch(() => undefined);
-    };
-  }, [scannerOpen]);
-  const stats = useMemo(() => ({
-    total: attendees.length,
-    guests: attendees.filter((item) => item.tipo !== "Protocolo").length,
-    visitors: attendees.filter((item) => item.tipo === "Protocolo").length,
-    checkedIn: attendees.filter((item) => !!item.llegada).length,
-    pending: attendees.filter((item) => !item.llegada).length,
-  }), [attendees]);
+  const stats = useMemo(
+    () => ({
+      total: attendees.length,
+      guests: attendees.filter((item) => item.tipo !== "Protocolo").length,
+      visitors: attendees.filter((item) => item.tipo === "Protocolo").length,
+      checkedIn: attendees.filter((item) => !!item.llegada).length,
+      pending: attendees.filter((item) => !item.llegada).length,
+    }),
+    [attendees],
+  );
 
   const filtered = useMemo(() => {
     let list = attendees;
@@ -316,25 +186,32 @@ function EventDetail() {
 
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter((item) =>
-        item.nombre.toLowerCase().includes(q) ||
-        item.cedula.includes(q) ||
-        item.institucion.toLowerCase().includes(q) ||
-        item.correo.toLowerCase().includes(q)
+      list = list.filter(
+        (item) =>
+          item.nombre.toLowerCase().includes(q) ||
+          item.cedula.includes(q) ||
+          item.institucion.toLowerCase().includes(q) ||
+          item.correo.toLowerCase().includes(q),
       );
     }
     return list;
   }, [attendees, query, tab]);
 
   if (eventQuery.isLoading) {
-    return <Card className="border-t-2 border-t-primary p-10 text-center text-sm text-muted-foreground">Cargando evento...</Card>;
+    return (
+      <Card className="border-t-2 border-t-primary p-10 text-center text-sm text-muted-foreground">
+        Cargando evento...
+      </Card>
+    );
   }
 
   if (!event) {
     return (
       <div>
         <Button asChild variant="ghost" className="mb-4">
-          <Link to="/eventos"><ArrowLeft className="h-4 w-4" /> Eventos</Link>
+          <Link to="/eventos">
+            <ArrowLeft className="h-4 w-4" /> Eventos
+          </Link>
         </Button>
         <Card className="border-t-2 border-t-primary p-10 text-center text-sm text-muted-foreground">
           Evento no encontrado.
@@ -376,38 +253,105 @@ function EventDetail() {
   function setVisitorField(key: keyof typeof visitorForm, value: string) {
     setVisitorForm((current) => ({ ...current, [key]: value }));
   }
-async function consultarCedula() {
-  if (!visitorForm.cedula.trim()) {
-    toast.error("Ingrese una cédula");
-    return;
+
+  async function handleEventQr(rawText: string) {
+    let qrId = rawText.trim();
+    let qrCedula = "";
+    let qrNombre = "";
+    let qrCargo = "";
+    let qrInstitucion = "";
+    let qrCorreo = "";
+    try {
+      const data = JSON.parse(rawText) as Record<string, unknown>;
+      qrId = String(data.id ?? data.guestId ?? data.invitadoId ?? data.codigo ?? "").trim();
+      qrCedula = String(data.cedula ?? data.documento ?? "").replace(/\D/g, "");
+      qrNombre = String(data.nombre ?? data.nombres ?? "").trim();
+      qrCargo = String(data.cargo ?? data.puesto ?? "").trim();
+      qrInstitucion = String(data.institucion ?? data.empresa ?? "").trim();
+      qrCorreo = String(data.correo ?? data.email ?? "").trim();
+    } catch {
+      try {
+        const url = new URL(rawText);
+        qrId = url.searchParams.get("id") ?? url.searchParams.get("guestId") ?? rawText.trim();
+        qrCedula = (url.searchParams.get("cedula") ?? "").replace(/\D/g, "");
+        qrNombre = url.searchParams.get("nombre") ?? "";
+        qrCargo = url.searchParams.get("cargo") ?? "";
+        qrInstitucion = url.searchParams.get("institucion") ?? "";
+        qrCorreo = url.searchParams.get("correo") ?? url.searchParams.get("email") ?? "";
+      } catch {
+        qrCedula = rawText.replace(/\D/g, "").length === 11 ? rawText.replace(/\D/g, "") : "";
+      }
+    }
+
+    const attendee = attendees.find(
+      (item) =>
+        item.id.toLowerCase() === qrId.toLowerCase() ||
+        (!!qrCedula && item.cedula.replace(/\D/g, "") === qrCedula),
+    );
+    if (finalized) throw new Error("El evento está finalizado.");
+
+    if (!attendee) {
+      const nextVisitor = {
+        nombre: qrNombre,
+        cedula: qrCedula,
+        cargo: qrCargo,
+        institucion: qrInstitucion,
+        correo: qrCorreo,
+      };
+      setVisitorForm(nextVisitor);
+      if (qrNombre) await createWalkIn.mutateAsync(nextVisitor);
+      else {
+        setVisitorOpen(true);
+        toast.info("QR nuevo detectado. Complete el nombre para registrarlo como visitante.");
+      }
+      return true;
+    }
+
+    if (!attendee.llegada) await checkIn.mutateAsync(attendee);
+    else if (!attendee.salida) await checkOut.mutateAsync(attendee);
+    else toast.info(`${attendee.nombre} ya tiene entrada y salida registradas.`);
+    return true;
   }
 
-  try {
-    setBuscandoPadron(true);
-
-    const persona = await apiClient.padronBuscar(visitorForm.cedula);
-
+  async function handleVisitorCedula(result: CedulaQrResult) {
     setVisitorForm((current) => ({
       ...current,
-      nombre: persona.nombre || current.nombre,
+      cedula: result.cedula,
+      nombre: result.nombre || current.nombre,
     }));
-
-    toast.success("Datos cargados desde el padrón");
-  } catch (error) {
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "No se encontró la cédula en el padrón"
-    );
-  } finally {
-    setBuscandoPadron(false);
+    if (!result.nombre) {
+      try {
+        const persona = await apiClient.padronBuscar(result.cedula);
+        setVisitorForm((current) => ({ ...current, nombre: persona.nombre || current.nombre }));
+      } catch {
+        toast.info("Cédula leída. Complete el nombre manualmente.");
+      }
+    }
+    toast.success("Cédula escaneada correctamente");
   }
-}
+  async function consultarCedula() {
+    if (!visitorForm.cedula.trim()) {
+      toast.error("Ingrese una cédula");
+      return;
+    }
 
-function escanearCedula() {
-  setScannerError("");
-  setScannerOpen(true);
-}
+    try {
+      setBuscandoPadron(true);
+
+      const persona = await apiClient.padronBuscar(visitorForm.cedula);
+
+      setVisitorForm((current) => ({
+        ...current,
+        nombre: persona.nombre || current.nombre,
+      }));
+
+      toast.success("Datos cargados desde el padrón");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se encontró la cédula en el padrón");
+    } finally {
+      setBuscandoPadron(false);
+    }
+  }
 
   function registerWalkIn() {
     if (finalized) {
@@ -418,13 +362,15 @@ function escanearCedula() {
       toast.error("El nombre es obligatorio");
       return;
     }
-    createWalkIn.mutate();
+    createWalkIn.mutate(visitorForm);
   }
 
   return (
     <div>
       <Button asChild variant="ghost" className="mb-4">
-        <Link to="/eventos"><ArrowLeft className="h-4 w-4" /> Eventos</Link>
+        <Link to="/eventos">
+          <ArrowLeft className="h-4 w-4" /> Eventos
+        </Link>
       </Button>
 
       <PageHeader
@@ -432,10 +378,19 @@ function escanearCedula() {
         subtitle="Gestiona la lista de invitados, visitantes y registro de llegada."
         actions={
           <>
+            <CedulaQrScanner
+              onScan={handleVisitorCedula}
+              onRawScan={handleEventQr}
+              buttonLabel="Escanear entrada / salida"
+            />
             <Button onClick={() => setVisitorOpen(true)} disabled={finalized}>
               <UserPlus className="mr-2 h-4 w-4" /> Registrar visitante
             </Button>
-            <Button variant="outline" onClick={() => toast("Importacion CSV pendiente")} disabled={finalized}>
+            <Button
+              variant="outline"
+              onClick={() => toast("Importacion CSV pendiente")}
+              disabled={finalized}
+            >
               <Upload className="mr-2 h-4 w-4" /> Importar lista
             </Button>
             {finalized ? (
@@ -453,18 +408,28 @@ function escanearCedula() {
 
       <Card className="mb-6 overflow-hidden border-t-2 border-t-primary p-5">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-primary" /> {event.fechaInicio}</span>
+          <span className="flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 text-primary" /> {event.fechaInicio}
+          </span>
           {mainSession && (
             <span className="flex items-center gap-1.5">
+              {mainSession.inicio === "00:00" && mainSession.fin === "23:59" ? (
+                <Sun className="h-4 w-4 text-primary" />
+              ) : (
+                <Clock className="h-4 w-4 text-primary" />
+              )}
               {mainSession.inicio === "00:00" && mainSession.fin === "23:59"
-                ? <Sun className="h-4 w-4 text-primary" />
-                : <Clock className="h-4 w-4 text-primary" />}
-              {mainSession.inicio === "00:00" && mainSession.fin === "23:59" ? "Todo el dia" : `${mainSession.inicio} - ${mainSession.fin}`}
+                ? "Todo el dia"
+                : `${mainSession.inicio} - ${mainSession.fin}`}
             </span>
           )}
-          <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" /> {event.lugar}</span>
+          <span className="flex items-center gap-1.5">
+            <MapPin className="h-4 w-4 text-primary" /> {event.lugar}
+          </span>
           {finalized ? (
-            <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/15">finalizado</Badge>
+            <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/15">
+              finalizado
+            </Badge>
           ) : (
             <Badge className="bg-success/15 text-success hover:bg-success/15">{event.estado}</Badge>
           )}
@@ -491,20 +456,31 @@ function escanearCedula() {
               }`}
             >
               {item.label}
-              <span className={`rounded-full px-1.5 text-xs ${tab === item.key ? "bg-primary-foreground/20" : "bg-muted"}`}>{item.count}</span>
+              <span
+                className={`rounded-full px-1.5 text-xs ${tab === item.key ? "bg-primary-foreground/20" : "bg-muted"}`}
+              >
+                {item.count}
+              </span>
             </button>
           ))}
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(inputEvent) => setQuery(inputEvent.target.value)} placeholder="Buscar por nombre, cedula..." className="pl-9" />
+          <Input
+            value={query}
+            onChange={(inputEvent) => setQuery(inputEvent.target.value)}
+            placeholder="Buscar por nombre, cedula..."
+            className="pl-9"
+          />
         </div>
       </div>
 
       <Card className="overflow-hidden border-t-2 border-t-primary">
         {attendeesQuery.isLoading || filtered.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            {attendeesQuery.isLoading ? "Cargando asistentes..." : "No hay asistentes que coincidan."}
+            {attendeesQuery.isLoading
+              ? "Cargando asistentes..."
+              : "No hay asistentes que coincidan."}
           </div>
         ) : (
           <div className="overflow-x-auto p-4 sm:p-5">
@@ -529,7 +505,12 @@ function escanearCedula() {
                     : hasEntry
                       ? "border-success/30 bg-success/15 text-success"
                       : "border-border bg-card text-muted-foreground hover:bg-muted";
-                  const btnIcon = hasEntry && !hasExit ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />;
+                  const btnIcon =
+                    hasEntry && !hasExit ? (
+                      <LogOut className="h-4 w-4" />
+                    ) : (
+                      <LogIn className="h-4 w-4" />
+                    );
                   const btnLabel = hasExit
                     ? `${attendee.nombre} ya registró salida`
                     : hasEntry
@@ -558,17 +539,34 @@ function escanearCedula() {
                         <div className="text-xs">{attendee.cedula}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={attendee.tipo === "VIP" ? "border-accent/40 bg-accent/10 text-accent" : ""}>{attendee.tipo}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            attendee.tipo === "VIP"
+                              ? "border-accent/40 bg-accent/10 text-accent"
+                              : ""
+                          }
+                        >
+                          {attendee.tipo}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        {attendee.llegada
-                          ? <span className="inline-flex items-center gap-1.5 text-success"><CheckCircle2 className="h-4 w-4" /> {displayTime(attendee.llegada)}</span>
-                          : <span className="text-muted-foreground">Sin registrar</span>}
+                        {attendee.llegada ? (
+                          <span className="inline-flex items-center gap-1.5 text-success">
+                            <CheckCircle2 className="h-4 w-4" /> {displayTime(attendee.llegada)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Sin registrar</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        {attendee.salida
-                          ? <span className="inline-flex items-center gap-1.5 text-destructive"><LogOut className="h-4 w-4" /> {displayTime(attendee.salida)}</span>
-                          : <span className="text-muted-foreground">-</span>}
+                        {attendee.salida ? (
+                          <span className="inline-flex items-center gap-1.5 text-destructive">
+                            <LogOut className="h-4 w-4" /> {displayTime(attendee.salida)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -577,13 +575,26 @@ function escanearCedula() {
                             size="icon"
                             aria-label={`Etiqueta ${attendee.nombre}`}
                             onClick={() => {
-                              setBadge({ id: attendee.id, nombre: attendee.nombre, cargo: attendee.cargo, institucion: attendee.institucion, evento: event.nombre, tipo: attendee.tipo });
+                              setBadge({
+                                id: attendee.id,
+                                nombre: attendee.nombre,
+                                cargo: attendee.cargo,
+                                institucion: attendee.institucion,
+                                evento: event.nombre,
+                                tipo: attendee.tipo,
+                              });
                               setBadgeOpen(true);
                             }}
                           >
                             <Printer className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${attendee.nombre}`} onClick={() => removeGuest.mutate(attendee.id)} disabled={finalized}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Eliminar ${attendee.nombre}`}
+                            onClick={() => removeGuest.mutate(attendee.id)}
+                            disabled={finalized}
+                          >
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </div>
@@ -597,100 +608,80 @@ function escanearCedula() {
         )}
       </Card>
 
-      <Dialog open={visitorOpen} onOpenChange={(open) => {
-        setVisitorOpen(open);
-        if (!open) setScannerOpen(false);
-      }}>
+      <Dialog open={visitorOpen} onOpenChange={setVisitorOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Registrar visitante al evento</DialogTitle>
-            <DialogDescription>Use este flujo para alguien que llego y no estaba en la lista de invitados.</DialogDescription>
+            <DialogDescription>
+              Use este flujo para alguien que llego y no estaba en la lista de invitados.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-  <Button
-    type="button"
-    variant="outline"
-    onClick={escanearCedula}
-  >
-    Escanear cédula
-  </Button>
-  {scannerOpen && (
-  <div className="mt-4">
-    {scannerStarting && <p className="mb-2 text-sm text-muted-foreground">Solicitando acceso a la cámara…</p>}
-    {scannerError && (
-      <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-        <p>{scannerError}</p>
-        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => {
-          setScannerOpen(false);
-          window.setTimeout(() => setScannerOpen(true), 0);
-        }}>
-          Reintentar
-        </Button>
-      </div>
-    )}
-    <div
-      id={QR_READER_ID}
-      className={scannerError ? "hidden" : "min-h-64 overflow-hidden rounded-lg border bg-black"}
-    />
-    {!scannerError && (
-      <p className="mt-2 text-xs text-muted-foreground">
-        Alinee el QR de la cédula dentro del recuadro. Si no enfoca, aleje un poco el documento y mejore la luz.
-      </p>
-    )}
-    
-    <Button
-      type="button"
-      variant="outline"
-      className="mt-3"
-      onClick={() => setScannerOpen(false)}
-    >
-      Cancelar escaneo
-    </Button>
-  </div>
-)}
-</div>
+              <CedulaQrScanner onScan={handleVisitorCedula} buttonLabel="Escanear cédula" />
+            </div>
             <div className="sm:col-span-2">
               <Label>Nombre completo</Label>
-              <Input value={visitorForm.nombre} onChange={(inputEvent) => setVisitorField("nombre", inputEvent.target.value)} className="mt-1.5" autoFocus />
+              <Input
+                value={visitorForm.nombre}
+                onChange={(inputEvent) => setVisitorField("nombre", inputEvent.target.value)}
+                className="mt-1.5"
+                autoFocus
+              />
             </div>
             <div>
-  <Label>Cedula / Documento</Label>
+              <Label>Cedula / Documento</Label>
 
-  <div className="mt-1.5 flex gap-2">
-    <Input
-      value={visitorForm.cedula}
-      onChange={(inputEvent) =>
-        setVisitorField("cedula", inputEvent.target.value)
-      }
-    />
+              <div className="mt-1.5 flex gap-2">
+                <Input
+                  value={visitorForm.cedula}
+                  onChange={(inputEvent) => setVisitorField("cedula", inputEvent.target.value)}
+                />
 
-    <Button
-      type="button"
-      variant="outline"
-      onClick={consultarCedula}
-      disabled={buscandoPadron}
-    >
-      <Search className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={consultarCedula}
+                  disabled={buscandoPadron}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
             <div>
               <Label>Cargo</Label>
-              <Input value={visitorForm.cargo} onChange={(inputEvent) => setVisitorField("cargo", inputEvent.target.value)} className="mt-1.5" />
+              <Input
+                value={visitorForm.cargo}
+                onChange={(inputEvent) => setVisitorField("cargo", inputEvent.target.value)}
+                className="mt-1.5"
+              />
             </div>
             <div>
               <Label>Institucion</Label>
-              <Input value={visitorForm.institucion} onChange={(inputEvent) => setVisitorField("institucion", inputEvent.target.value)} className="mt-1.5" />
+              <Input
+                value={visitorForm.institucion}
+                onChange={(inputEvent) => setVisitorField("institucion", inputEvent.target.value)}
+                className="mt-1.5"
+              />
             </div>
             <div>
               <Label>Correo</Label>
-              <Input value={visitorForm.correo} onChange={(inputEvent) => setVisitorField("correo", inputEvent.target.value)} className="mt-1.5" />
+              <Input
+                value={visitorForm.correo}
+                onChange={(inputEvent) => setVisitorField("correo", inputEvent.target.value)}
+                className="mt-1.5"
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setVisitorOpen(false)}>Cancelar</Button>
-            <Button className="bg-accent text-accent-foreground hover:opacity-90" onClick={registerWalkIn} disabled={createWalkIn.isPending}>
+            <Button variant="outline" onClick={() => setVisitorOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-accent text-accent-foreground hover:opacity-90"
+              onClick={registerWalkIn}
+              disabled={createWalkIn.isPending}
+            >
               Registrar llegada y etiqueta
             </Button>
           </div>
@@ -709,22 +700,44 @@ function escanearCedula() {
           </DialogHeader>
           {confirmAction && (
             <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
-              <div className="text-base font-semibold text-foreground">{confirmAction.attendee.nombre}</div>
-              <div className="mt-1 text-muted-foreground">{confirmAction.attendee.cargo} · {confirmAction.attendee.institucion}</div>
+              <div className="text-base font-semibold text-foreground">
+                {confirmAction.attendee.nombre}
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                {confirmAction.attendee.cargo} · {confirmAction.attendee.institucion}
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <div><span className="font-medium text-foreground">Cédula:</span> {confirmAction.attendee.cedula}</div>
-                <div><span className="font-medium text-foreground">Tipo:</span> {confirmAction.attendee.tipo}</div>
-                <div className="col-span-2"><span className="font-medium text-foreground">Correo:</span> {confirmAction.attendee.correo}</div>
+                <div>
+                  <span className="font-medium text-foreground">Cédula:</span>{" "}
+                  {confirmAction.attendee.cedula}
+                </div>
+                <div>
+                  <span className="font-medium text-foreground">Tipo:</span>{" "}
+                  {confirmAction.attendee.tipo}
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium text-foreground">Correo:</span>{" "}
+                  {confirmAction.attendee.correo}
+                </div>
                 {confirmAction.attendee.llegada && (
-                  <div className="col-span-2"><span className="font-medium text-foreground">Entrada:</span> {confirmAction.attendee.llegada}</div>
+                  <div className="col-span-2">
+                    <span className="font-medium text-foreground">Entrada:</span>{" "}
+                    {confirmAction.attendee.llegada}
+                  </div>
                 )}
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>
+              Cancelar
+            </Button>
             <Button
-              className={confirmAction?.kind === "salida" ? "bg-destructive text-destructive-foreground hover:opacity-90" : ""}
+              className={
+                confirmAction?.kind === "salida"
+                  ? "bg-destructive text-destructive-foreground hover:opacity-90"
+                  : ""
+              }
               onClick={performToggle}
               disabled={checkIn.isPending || checkOut.isPending}
             >
@@ -739,12 +752,19 @@ function escanearCedula() {
           <DialogHeader>
             <DialogTitle>Finalizar evento</DialogTitle>
             <DialogDescription>
-              Una vez finalizado no se podrán registrar entradas ni salidas, ni agregar nuevos invitados. Esta acción no se puede deshacer.
+              Una vez finalizado no se podrán registrar entradas ni salidas, ni agregar nuevos
+              invitados. Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFinalizeOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => finalizeEvent.mutate()} disabled={finalizeEvent.isPending}>
+            <Button variant="outline" onClick={() => setFinalizeOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => finalizeEvent.mutate()}
+              disabled={finalizeEvent.isPending}
+            >
               <Lock className="mr-2 h-4 w-4" /> Finalizar
             </Button>
           </DialogFooter>
