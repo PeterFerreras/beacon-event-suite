@@ -126,6 +126,33 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+async function download(path: string): Promise<void> {
+  const token = typeof window === "undefined" ? "" : window.localStorage.getItem("cf-auth-token");
+  const response = await fetch(`${API_URL}${path}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  if (!response.ok) {
+    const text = await response.text();
+    let message = "No se pudo generar el reporte.";
+    try {
+      const data = text ? JSON.parse(text) : null;
+      message = data?.detail || data?.error || message;
+    } catch {
+      message = text || message;
+    }
+    throw new Error(message);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? "reporte";
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 // URL absoluta a la foto del padron, servida por el backend. Uso directo en <img src>.
 export const padronFotoUrl = (cedula: string) => {
   const clean = (cedula ?? "").replace(/\D/g, "");
@@ -203,15 +230,9 @@ export const apiClient = {
       body: JSON.stringify({ password }),
     }),
   guestTypes: () => api<{ id: string; nombre: string; color?: string }[]>("/guest-types"),
-  createGuestType: (nombre: string) =>
-    api<{ id: string; nombre: string }>("/guest-types", {
-      method: "POST",
-      body: JSON.stringify({ nombre }),
-    }),
-  report: (tipo: string, eventoId?: string) =>
-    api<{ tipo: string; items: unknown[] }>(
-      `/reports/${tipo}${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ""}`,
-    ),
+  createGuestType: (nombre: string) => api<{ id: string; nombre: string }>("/guest-types", { method: "POST", body: JSON.stringify({ nombre }) }),
+  report: (tipo: string) => api<{ tipo: string; items: unknown[] }>(`/reports/${tipo}`),
+  downloadReport: (tipo: string, format: "csv" | "pdf") => download(`/reports/${tipo}?format=${format}`),
   // Padron
   padronBuscar: (cedula: string) =>
     api<PadronPersona>(`/padron/buscar?cedula=${encodeURIComponent(cedula.replace(/\D/g, ""))}`),

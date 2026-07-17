@@ -76,4 +76,206 @@ function users_create(Database $db): void { $d=request_json(); $name=str_input($
 function users_update(Database $db,string $id): void { $d=request_json(); $sets=[];$p=[]; if(array_key_exists('nombre',$d)){ $sets[]='name=?'; $p[]=str_input($d,'nombre',''); } if(array_key_exists('correo',$d)){ $sets[]='email=?'; $p[]=strtolower((string)str_input($d,'correo','')); } if(array_key_exists('rol',$d)){ $role=str_input($d,'rol'); if(!valid_user_role($role)){Response::error('Rol invalido',422);return;} $sets[]='role=?'; $p[]=$role; } if(array_key_exists('activo',$d)){ $sets[]='active=?'; $p[]=bool_input($d,'activo',true)?1:0; } if(!$sets){ users_list($db); return; } $p[]=$id; $db->execute('UPDATE users SET '.implode(',',$sets).' WHERE id=?',$p); Response::json($db->one('SELECT id,name AS nombre,role AS rol,email AS correo,active AS activo FROM users WHERE id=?',[$id])); }
 function users_reset_password(Database $db,string $id): void { $d=request_json(); $password=str_input($d,'password','Temp1234!'); if(strlen($password)<8){Response::error('La contraseña debe tener al menos 8 caracteres',422);return;} $db->execute('UPDATE users SET password_hash=? WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),$id]); $db->execute('DELETE FROM auth_sessions WHERE user_id=?',[$id]); Response::json(['updated'=>true,'temporaryPassword'=>$password]); }
 function settings(Database $db): array { $out=[]; foreach($db->all('SELECT setting_key,setting_value FROM settings') as $r)$out[$r['setting_key']]=$r['setting_value']; return $out; }
-function report(Database $db,string $type): void { if($type==='visitantes'||$type==='fotografico'){Response::json(['tipo'=>$type,'items'=>array_map('visitor_row',$db->all(visitor_select().' ORDER BY vs.entry_at DESC'))]);return;} if(in_array($type,['asistencia','confirmados','ausentes'],true)){ $eventId=$_GET['eventoId']??null; $sql=guest_select(); $p=[]; if($eventId){$sql.=' WHERE g.event_id=?';$p[]=$eventId;} $items=array_map('guest_row',$db->all($sql.' ORDER BY g.name',$p)); if($type==='confirmados')$items=array_values(array_filter($items,fn($i)=>$i['confirmacion']==='aceptado')); if($type==='ausentes')$items=array_values(array_filter($items,fn($i)=>$i['confirmacion']==='aceptado'&&!$i['llegada'])); Response::json(['tipo'=>$type,'items'=>$items]); return; } Response::error('Reporte no soportado',404); }
+function report(Database $db,string $type): void {
+  $format=strtolower((string)($_GET['format']??'json'));
+  $data=report_dataset($db,$type);
+  if(!$data){Response::error('Reporte no soportado',404);return;}
+  if($format==='csv'||$format==='excel'||$format==='xlsx'){download_csv($data);return;}
+  if($format==='pdf'){download_pdf($data);return;}
+  Response::json(['tipo'=>$type,'items'=>$data['rows']]);
+}
+function report_dataset(Database $db,string $type): ?array {
+  if($type==='visitantes'){
+    $rows=array_map('visitor_row',$db->all(visitor_select().' ORDER BY vs.entry_at DESC'));
+    $columns=[['cedula','Documento'],['nombre','Nombre'],['cargo','Cargo'],['institucion','Institucion'],['area','Area'],['telefono','Telefono'],['correo','Correo'],['motivo','Motivo'],['entrada','Entrada'],['salida','Salida'],['status','Estado'],['acompanantes','Acompanantes']];
+    return ['title'=>'Reporte de visitantes','filename'=>$type,'columns'=>$columns,'rows'=>$rows];
+  }
+  if(in_array($type,['asistencia','confirmados','ausentes'],true)){
+    $sql='SELECT g.*,gt.name AS type_name,e.name AS event_name,e.starts_on AS event_date,e.location AS event_location FROM guests g JOIN guest_types gt ON gt.id=g.guest_type_id JOIN events e ON e.id=g.event_id ORDER BY e.starts_on DESC,e.name,g.name';
+    $rows=array_map(fn($r)=>['evento'=>$r['event_name'],'fecha'=>$r['event_date'],'lugar'=>$r['event_location']]+guest_row($r),$db->all($sql));
+    if($type==='confirmados')$rows=array_values(array_filter($rows,fn($i)=>$i['confirmacion']==='aceptado'));
+    if($type==='ausentes')$rows=array_values(array_filter($rows,fn($i)=>$i['confirmacion']==='aceptado'&&!$i['llegada']));
+    $titles=['asistencia'=>'Reporte de asistencia por evento','confirmados'=>'Reporte de invitados confirmados','ausentes'=>'Reporte de invitados ausentes'];
+    return ['title'=>$titles[$type],'filename'=>$type,'groupBy'=>'evento','columns'=>[['evento','Evento'],['fecha','Fecha'],['lugar','Lugar'],['cedula','Documento'],['nombre','Nombre'],['cargo','Cargo'],['institucion','Institucion'],['correo','Correo'],['tipo','Tipo'],['confirmacion','Confirmacion'],['llegada','Entrada'],['salida','Salida'],['esVisitante','Visitante externo']],'rows'=>$rows];
+  }
+  return null;
+}
+function download_csv(array $data): void {
+  $filename=safe_filename((string)$data['filename']).'-'.date('Ymd-His').'.csv';
+  http_response_code(200);
+  header('Content-Type: text/csv; charset=utf-8');
+  header('Content-Disposition: attachment; filename="'.$filename.'"');
+  echo "\xEF\xBB\xBF";
+  $out=fopen('php://output','w');
+  if(isset($data['groupBy'])) {
+    $groups=report_groups($data);
+    foreach($groups as $group){
+      fputcsv($out,['Evento',$group['label']]);
+      if(isset($group['meta']))fputcsv($out,['Fecha',report_value($group['meta']['fecha']??''),'Lugar',report_value($group['meta']['lugar']??'')]);
+      fputcsv($out,array_map(fn($c)=>$c[1],report_detail_columns($data)));
+      foreach($group['rows'] as $i=>$row)fputcsv($out,array_merge([$i+1],array_map(fn($c)=>report_value($row[$c[0]]??''),report_detail_columns($data,true))));
+      fputcsv($out,[]);
+    }
+  } else {
+    fputcsv($out,array_map(fn($c)=>$c[1],$data['columns']));
+    foreach($data['rows'] as $row)fputcsv($out,array_map(fn($c)=>report_value($row[$c[0]]??''),$data['columns']));
+  }
+  fclose($out);
+}
+function download_pdf(array $data): void {
+  $filename=safe_filename((string)$data['filename']).'-'.date('Ymd-His').'.pdf';
+  $lines=report_pdf_lines($data);
+  $pdf=build_text_pdf((string)$data['title'],$lines);
+  http_response_code(200);
+  header('Content-Type: application/pdf');
+  header('Content-Disposition: attachment; filename="'.$filename.'"');
+  header('Content-Length: '.strlen($pdf));
+  echo $pdf;
+}
+function report_pdf_lines(array $data): array {
+  $lines=['Generado: '.date('Y-m-d H:i:s'),'Registros: '.count($data['rows']),''];
+  if(!$data['rows'])return array_merge($lines,['No hay registros para este reporte.']);
+  if(isset($data['groupBy'])){
+    foreach(report_groups($data) as $group){
+      $lines[]='Evento: '.$group['label'];
+      if(isset($group['meta']))$lines[]='Fecha: '.report_value($group['meta']['fecha']??'').' | Lugar: '.report_value($group['meta']['lugar']??'');
+      foreach($group['rows'] as $i=>$row){
+        $parts=[];
+        foreach(report_detail_columns($data,true) as $c)$parts[]=$c[1].': '.report_value($row[$c[0]]??'');
+        foreach(explode("\n",wordwrap(($i+1).'. '.implode(' | ',$parts),95,"\n",true)) as $line)$lines[]=$line;
+      }
+      $lines[]='';
+    }
+    return $lines;
+  }
+  foreach($data['rows'] as $i=>$row){
+    $parts=[];
+    foreach($data['columns'] as $c)$parts[]=$c[1].': '.report_value($row[$c[0]]??'');
+    foreach(explode("\n",wordwrap(($i+1).'. '.implode(' | ',$parts),95,"\n",true)) as $line)$lines[]=$line;
+    $lines[]='';
+  }
+  return $lines;
+}
+function report_groups(array $data): array {
+  $key=(string)$data['groupBy'];
+  $groups=[];
+  foreach($data['rows'] as $row){
+    $label=report_value($row[$key]??'Sin evento');
+    if(!isset($groups[$label]))$groups[$label]=['label'=>$label,'meta'=>['fecha'=>$row['fecha']??null,'lugar'=>$row['lugar']??null],'rows'=>[]];
+    $groups[$label]['rows'][]=$row;
+  }
+  return array_values($groups);
+}
+function report_detail_columns(array $data,bool $skipIndex=false): array {
+  $columns=array_values(array_filter($data['columns'],fn($c)=>!in_array($c[0],['evento','fecha','lugar'],true)));
+  return $skipIndex?$columns:array_merge([['#','#']],$columns);
+}
+function build_text_pdf(string $title,array $lines): string {
+  $pages=array_chunk($lines,54);
+  $objects=[];
+  $catalogObj=pdf_add_object($objects,'');
+  $pagesObj=pdf_add_object($objects,'');
+  $fontObj=pdf_add_object($objects,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  $boldObj=pdf_add_object($objects,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+  $logo=pdf_logo_image();
+  $logoObj=null;
+  if($logo){
+    $maskObj=pdf_add_object($objects,'<< /Type /XObject /Subtype /Image /Width '.$logo['width'].' /Height '.$logo['height'].' /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length '.strlen($logo['alpha'])." >>\nstream\n".$logo['alpha']."\nendstream");
+    $logoObj=pdf_add_object($objects,'<< /Type /XObject /Subtype /Image /Width '.$logo['width'].' /Height '.$logo['height'].' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /SMask '.$maskObj.' 0 R /Length '.strlen($logo['rgb'])." >>\nstream\n".$logo['rgb']."\nendstream");
+  }
+  $kids=[];
+  foreach($pages as $pageIndex=>$pageLines){
+    $content=pdf_stream($title,$pageLines,$pageIndex+1,count($pages),(bool)$logoObj);
+    $contentObj=pdf_add_object($objects,'<< /Length '.strlen($content).' >>'."\nstream\n".$content."\nendstream");
+    $resources='<< /Font << /F1 '.$fontObj.' 0 R /F2 '.$boldObj.' 0 R >>'.($logoObj?' /XObject << /Logo '.$logoObj.' 0 R >>':'').' >>';
+    $pageObj=pdf_add_object($objects,'<< /Type /Page /Parent '.$pagesObj.' 0 R /MediaBox [0 0 612 792] /Resources '.$resources.' /Contents '.$contentObj.' 0 R >>');
+    $kids[]=$pageObj.' 0 R';
+  }
+  $objects[$catalogObj-1]='<< /Type /Catalog /Pages '.$pagesObj.' 0 R >>';
+  $objects[$pagesObj-1]='<< /Type /Pages /Kids ['.implode(' ',$kids).'] /Count '.count($pages).' >>';
+  $pdf="%PDF-1.4\n";$offsets=[0];
+  foreach($objects as $i=>$obj){$offsets[$i+1]=strlen($pdf);$pdf.=($i+1)." 0 obj\n".$obj."\nendobj\n";}
+  $xref=strlen($pdf);$pdf.="xref\n0 ".(count($objects)+1)."\n0000000000 65535 f \n";
+  for($i=1;$i<=count($objects);$i++)$pdf.=sprintf("%010d 00000 n \n",$offsets[$i]);
+  return $pdf."trailer\n<< /Size ".(count($objects)+1)." /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
+}
+function pdf_add_object(array &$objects,string $body): int { $objects[]=$body; return count($objects); }
+function pdf_stream(string $title,array $lines,int $page,int $total,bool $hasLogo): string {
+  $cmd="0.02 0.12 0.24 rg 0 728 612 64 re f\n";
+  $cmd.="0.12 0.48 0.86 rg 0 728 612 4 re f\n";
+  if($hasLogo)$cmd.="q 58 0 0 24 36 748 cm /Logo Do Q\n";
+  else {$cmd.="1 1 1 rg 36 746 58 28 re f\n0.12 0.48 0.86 rg 42 757 46 6 re f\n";}
+  $cmd.="BT /F2 8 Tf 106 766 Td 1 0.66 0 rg (COSTA DEL FARO) Tj ET\n";
+  $cmd.="BT /F2 12 Tf 106 748 Td 1 1 1 rg (Registro de Eventos y Visitas) Tj ET\n";
+  $cmd.="BT /F1 8 Tf 508 748 Td 0.86 0.92 1 rg (Pagina ".$page." de ".$total.") Tj ET\n";
+  $cmd.="BT /F2 18 Tf 36 700 Td 0.03 0.11 0.22 rg (".pdf_escape($title).") Tj ET\n";
+  $cmd.="1 0.39 0.04 rg 36 690 42 2 re f\n";
+  $y=662;
+  foreach($lines as $line){
+    $text=(string)$line;
+    if($text===''){ $y-=8; continue; }
+    if(str_starts_with($text,'Generado:')||str_starts_with($text,'Registros:')){
+      $cmd.="BT /F1 8 Tf 36 ".$y." Td 0.29 0.35 0.43 rg (".pdf_escape($text).") Tj ET\n";
+      $y-=12;
+      continue;
+    }
+    if(str_starts_with($text,'Evento:')){
+      $y-=4;
+      $cmd.="0.91 0.96 1 rg 36 ".($y-8)." 540 20 re f\n";
+      $cmd.="0.12 0.48 0.86 rg 36 ".($y-8)." 4 20 re f\n";
+      $cmd.="BT /F2 10 Tf 48 ".$y." Td 0.03 0.11 0.22 rg (".pdf_escape($text).") Tj ET\n";
+      $y-=18;
+      continue;
+    }
+    if(str_starts_with($text,'Fecha:')){
+      $cmd.="BT /F1 8 Tf 48 ".$y." Td 0.29 0.35 0.43 rg (".pdf_escape($text).") Tj ET\n";
+      $y-=12;
+      continue;
+    }
+    $cmd.="BT /F1 7.2 Tf 48 ".$y." Td 0.08 0.12 0.18 rg (".pdf_escape($text).") Tj ET\n";
+    $y-=10;
+  }
+  $cmd.="0.88 0.9 0.94 RG 36 34 540 0.5 re S\n";
+  $cmd.="BT /F1 7 Tf 36 22 Td 0.45 0.5 0.57 rg (Costa del Faro - Reporte institucional generado automaticamente) Tj ET\n";
+  return $cmd;
+}
+function pdf_logo_image(): ?array {
+  $path=dirname(__DIR__,2).'/public/logo-cf.png';
+  if(!is_file($path))return null;
+  $png=file_get_contents($path);
+  if(substr($png,0,8)!=="\x89PNG\r\n\x1a\n")return null;
+  $pos=8;$width=0;$height=0;$bit=0;$color=0;$idat='';
+  while($pos<strlen($png)){
+    $len=unpack('N',substr($png,$pos,4))[1];$type=substr($png,$pos+4,4);$data=substr($png,$pos+8,$len);$pos+=12+$len;
+    if($type==='IHDR'){[$width,$height,$bit,$color]=array_values(unpack('Nwidth/Nheight/Cbit/Ccolor',$data));}
+    if($type==='IDAT')$idat.=$data;
+    if($type==='IEND')break;
+  }
+  if($bit!==8||$color!==6||!$idat)return null;
+  $raw=@gzuncompress($idat);
+  if($raw===false)return null;
+  $rows=png_unfilter($raw,$width,$height,4);
+  if(!$rows)return null;
+  $rgb='';$alpha='';
+  foreach($rows as $row)for($x=0;$x<$width;$x++){ $i=$x*4; $rgb.=substr($row,$i,3); $alpha.=$row[$i+3]; }
+  return ['width'=>$width,'height'=>$height,'rgb'=>gzcompress($rgb),'alpha'=>gzcompress($alpha)];
+}
+function png_unfilter(string $raw,int $width,int $height,int $bpp): ?array {
+  $stride=$width*$bpp;$rows=[];$offset=0;$prev=str_repeat("\0",$stride);
+  for($y=0;$y<$height;$y++){
+    if($offset>=strlen($raw))return null;
+    $filter=ord($raw[$offset++]);$scan=substr($raw,$offset,$stride);$offset+=$stride;$row='';
+    for($i=0;$i<$stride;$i++){
+      $x=ord($scan[$i]);$a=$i>=$bpp?ord($row[$i-$bpp]):0;$b=ord($prev[$i]);$c=$i>=$bpp?ord($prev[$i-$bpp]):0;
+      $val=match($filter){0=>$x,1=>$x+$a,2=>$x+$b,3=>$x+intdiv($a+$b,2),4=>$x+png_paeth($a,$b,$c),default=>null};
+      if($val===null)return null;
+      $row.=chr($val&255);
+    }
+    $rows[]=$row;$prev=$row;
+  }
+  return $rows;
+}
+function png_paeth(int $a,int $b,int $c): int { $p=$a+$b-$c;$pa=abs($p-$a);$pb=abs($p-$b);$pc=abs($p-$c); return $pa<=$pb&&$pa<=$pc?$a:($pb<=$pc?$b:$c); }
+function report_value(mixed $value): string { if(is_bool($value))return $value?'Si':'No'; if($value===null||$value==='')return '-'; return trim(preg_replace('/\s+/',' ',(string)$value)); }
+function safe_filename(string $name): string { return preg_replace('/[^a-z0-9_-]+/i','-',strtolower($name))?:'reporte'; }
+function pdf_escape(string $value): string { return str_replace(["\\","(",")","\r","\n"],["\\\\","\\(","\\)"," "," "],$value); }
