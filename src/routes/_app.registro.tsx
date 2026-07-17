@@ -77,7 +77,7 @@ function Registro() {
   const register = (print = false) => {
     if (!form.nombre || !form.cedula) { toast.error("Cedula y nombre son obligatorios"); return; }
     createVisitor.mutate(
-      { ...form, foto: foto ?? null, acompanantes: acomps.map(({ nombre, cedula }) => ({ nombre, cedula })) },
+      { ...form, acompanantes: acomps.map(({ nombre, cedula }) => ({ nombre, cedula })) },
       { onSuccess: (visitor) => { if (print) { setBadge({ id: visitor.id, nombre: visitor.nombre, cargo: visitor.cargo, institucion: visitor.institucion, tipo: "Visitante" }); setOpen(true); } } },
     );
   };
