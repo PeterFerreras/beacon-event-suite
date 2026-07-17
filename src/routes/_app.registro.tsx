@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiClient, padronFotoUrl } from "@/lib/api";
+import { apiClient, padronFotoUrl, storedPadronPhotoUrl, visitorPhotoUrl } from "@/lib/api";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/registro")({
@@ -110,7 +110,7 @@ function Registro() {
       correo: v.correo,
       motivo: "",
     });
-    setFoto(v.foto || padronFotoUrl(v.cedula) || null);
+    setFoto(visitorPhotoUrl(v.foto, v.cedula) || null);
     setQuery("");
     toast.success("Datos cargados desde el registro historico");
   };
@@ -123,7 +123,7 @@ function Registro() {
     createVisitor.mutate(
       {
         ...form,
-        foto: foto ?? null,
+        foto: storedPadronPhotoUrl(form.cedula) ?? foto ?? null,
         acompanantes: acomps.map(({ nombre, cedula }) => ({ nombre, cedula })),
       },
       {
@@ -300,22 +300,24 @@ function Registro() {
             <CardTitle className="font-display">Foto y documento</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid aspect-[4/5] max-h-[28rem] place-items-center overflow-hidden rounded-[var(--radius)] border-2 border-dashed border-primary/25 bg-primary/5 p-2 text-muted-foreground">
-              {foto ? (
-                <img
-                  src={foto}
-                  alt={form.nombre || "Foto padron"}
-                  className="h-full w-full rounded-[calc(var(--radius)-4px)] object-contain object-center"
-                  onError={() => setFoto(null)}
-                />
-              ) : (
-                <div className="text-center">
-                  <Camera className="mx-auto h-8 w-8 text-primary" />
-                  <div className="mt-2 text-xs">
-                    {padronLoading ? "Consultando padron..." : "Capturar / subir foto"}
+            <div className="mx-auto aspect-square w-full max-w-md overflow-hidden rounded-full border-2 border-cyan-300/80 bg-transparent text-muted-foreground shadow-[0_0_22px_rgba(103,232,249,.55),0_18px_40px_-18px_rgba(15,23,42,.55)] ring-2 ring-cyan-200/60 dark:border-cyan-300/80">
+              <div className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-hidden rounded-full bg-transparent">
+                {foto ? (
+                  <img
+                    src={foto}
+                    alt={form.nombre || "Foto padron"}
+                    className="h-full w-full rounded-full object-cover object-center"
+                    onError={() => setFoto(null)}
+                  />
+                ) : (
+                  <div className="text-center">
+                    <Camera className="mx-auto h-8 w-8 text-primary" />
+                    <div className="mt-2 text-xs">
+                      {padronLoading ? "Consultando padron..." : "Capturar / subir foto"}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             <Button variant="outline" className="w-full">
               Adjuntar documento

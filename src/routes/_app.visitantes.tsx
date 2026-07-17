@@ -8,25 +8,47 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiClient, padronFotoUrl, type Visitor } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { apiClient, visitorPhotoUrl, type Visitor } from "@/lib/api";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/visitantes")({ head: () => ({ meta: [{ title: "Visitantes - G-Visitantes" }] }), component: Visitantes });
+export const Route = createFileRoute("/_app/visitantes")({
+  head: () => ({ meta: [{ title: "Visitantes - G-Visitantes" }] }),
+  component: Visitantes,
+});
 
 function VisitorAvatar({ v }: { v: Visitor }) {
-  const src = v.foto || padronFotoUrl(v.cedula);
-  const initials = (v.nombre || "?").split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("");
+  const src = visitorPhotoUrl(v.foto, v.cedula);
+  const initials = (v.nombre || "?")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("");
   return (
-    <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border bg-primary/10 text-xs font-semibold text-primary">
+    <div className="grid aspect-square h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-cyan-300/90 bg-transparent text-xs font-semibold text-primary shadow-[0_0_12px_rgba(103,232,249,.58),0_7px_14px_-7px_rgba(15,23,42,.75)] ring-1 ring-cyan-200/70 dark:border-cyan-300/80">
       {src ? (
         <img
           src={src}
           alt={v.nombre}
-          className="h-full w-full object-cover"
+          className="h-full w-full rounded-full object-cover object-center"
           loading="lazy"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
         />
       ) : (
         <span>{initials}</span>
@@ -41,21 +63,58 @@ function Visitantes() {
   const [status, setStatus] = useState("todos");
   const [badge, setBadge] = useState<BadgeData | null>(null);
   const [open, setOpen] = useState(false);
-  const { data: visitors = [], isLoading } = useQuery({ queryKey: ["visitors", status], queryFn: () => apiClient.visitors(status) });
-  const exitVisitor = useMutation({ mutationFn: apiClient.exitVisitor, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["visitors"] }); queryClient.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Salida registrada"); } });
-  const list = useMemo(() => visitors.filter((v) => !q || v.nombre.toLowerCase().includes(q.toLowerCase()) || v.cedula.includes(q) || v.institucion.toLowerCase().includes(q.toLowerCase())), [q, visitors]);
+  const { data: visitors = [], isLoading } = useQuery({
+    queryKey: ["visitors", status],
+    queryFn: () => apiClient.visitors(status),
+  });
+  const exitVisitor = useMutation({
+    mutationFn: apiClient.exitVisitor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["visitors"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Salida registrada");
+    },
+  });
+  const list = useMemo(
+    () =>
+      visitors.filter(
+        (v) =>
+          !q ||
+          v.nombre.toLowerCase().includes(q.toLowerCase()) ||
+          v.cedula.includes(q) ||
+          v.institucion.toLowerCase().includes(q.toLowerCase()),
+      ),
+    [q, visitors],
+  );
   return (
     <div>
-      <PageHeader title="Visitantes" subtitle="Historial y estado en tiempo real de visitantes institucionales." actions={<Button asChild className="bg-accent text-accent-foreground hover:opacity-90"><Link to="/registro"><UserPlus className="mr-2 h-4 w-4" /> Registrar visitante</Link></Button>} />
+      <PageHeader
+        title="Visitantes"
+        subtitle="Historial y estado en tiempo real de visitantes institucionales."
+        actions={
+          <Button asChild className="bg-accent text-accent-foreground hover:opacity-90">
+            <Link to="/registro">
+              <UserPlus className="mr-2 h-4 w-4" /> Registrar visitante
+            </Link>
+          </Button>
+        }
+      />
       <Card className="overflow-hidden border-t-2 border-t-primary">
         <CardContent className="p-4 sm:p-5">
           <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_140px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, cedula o institucion..." className="pl-9" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar por nombre, cedula o institucion..."
+                className="pl-9"
+              />
             </div>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos los estados</SelectItem>
                 <SelectItem value="dentro">Dentro</SelectItem>
@@ -80,11 +139,31 @@ function Visitantes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading && <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Cargando visitantes...</TableCell></TableRow>}
-                {!isLoading && list.length === 0 && <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">No hay visitantes registrados.</TableCell></TableRow>}
+                {isLoading && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      Cargando visitantes...
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!isLoading && list.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No hay visitantes registrados.
+                    </TableCell>
+                  </TableRow>
+                )}
                 {list.map((v) => (
                   <TableRow key={v.id}>
-                    <TableCell><VisitorAvatar v={v} /></TableCell>
+                    <TableCell>
+                      <VisitorAvatar v={v} />
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium text-foreground">{v.nombre}</div>
                       <div className="text-xs text-muted-foreground">{v.cargo}</div>
@@ -94,11 +173,42 @@ function Visitantes() {
                     <TableCell className="text-sm">{v.area}</TableCell>
                     <TableCell className="text-sm">{v.entrada?.slice(11) ?? "-"}</TableCell>
                     <TableCell className="text-sm">{v.salida?.slice(11) ?? "-"}</TableCell>
-                    <TableCell>{v.status === "dentro" ? <Badge className="bg-success/15 text-success hover:bg-success/15">Dentro</Badge> : <Badge variant="outline">Fuera</Badge>}</TableCell>
+                    <TableCell>
+                      {v.status === "dentro" ? (
+                        <Badge className="bg-success/15 text-success hover:bg-success/15">
+                          Dentro
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Fuera</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => { setBadge({ id: v.id, nombre: v.nombre, cargo: v.cargo, institucion: v.institucion, tipo: "Visitante" }); setOpen(true); }}><Printer className="h-4 w-4" /></Button>
-                        {v.status === "dentro" && <Button size="sm" variant="ghost" onClick={() => exitVisitor.mutate(v.id)}><LogOut className="h-4 w-4" /></Button>}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setBadge({
+                              id: v.id,
+                              nombre: v.nombre,
+                              cargo: v.cargo,
+                              institucion: v.institucion,
+                              tipo: "Visitante",
+                            });
+                            setOpen(true);
+                          }}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        {v.status === "dentro" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => exitVisitor.mutate(v.id)}
+                          >
+                            <LogOut className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
