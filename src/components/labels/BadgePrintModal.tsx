@@ -43,10 +43,9 @@ export function BadgePrintModal({
   }, [qrValue]);
 
   if (!badge) return null;
+  const b = badge;
 
   async function downloadLabel() {
-    if (!badge) return;
-    const b = badge;
     const safeName = b.nombre.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     const qr = await QRCode.toString(qrValue, {
       type: "svg",
