@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export type BadgeData = {
   nombre: string;
+  cedula?: string;
   cargo?: string;
   institucion?: string;
   evento?: string;
@@ -23,7 +24,7 @@ export function BadgePrintModal({
   data: BadgeData | null;
 }) {
   const badge = data;
-  const qrValue = useMemo(() => JSON.stringify({ id: badge?.id ?? "", nombre: badge?.nombre ?? "", evento: badge?.evento ?? "" }), [badge]);
+  const qrValue = useMemo(() => JSON.stringify({ id: badge?.id ?? "", cedula: badge?.cedula ?? badge?.id ?? "", nombre: badge?.nombre ?? "", evento: badge?.evento ?? "" }), [badge]);
   const [qrSvg, setQrSvg] = useState("");
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function BadgePrintModal({
     <div class="top"><div class="brand">Costa del Faro</div>${b.tipo ? `<div class="type">${escapeHtml(b.tipo)}</div>` : ""}</div>
     <div class="eyebrow">Nombre</div>
     <h1>${escapeHtml(b.nombre)}</h1>
+    ${b.cedula ? `<div class="muted"><strong>Documento:</strong> ${escapeHtml(b.cedula)}</div>` : ""}
     ${b.cargo ? `<div class="muted">${escapeHtml(b.cargo)}</div>` : ""}
     ${b.institucion ? `<div class="muted">${escapeHtml(b.institucion)}</div>` : ""}
     ${b.evento ? `<div class="event"><strong>Evento:</strong> ${escapeHtml(b.evento)}</div>` : ""}
@@ -120,6 +122,7 @@ export function BadgePrintModal({
             <div className="mt-4 min-h-[3.5rem]">
               <div className="text-[10px] uppercase tracking-widest text-[#667085]">Nombre</div>
               <div className="font-display text-xl font-semibold leading-tight text-[#101828]">{b.nombre}</div>
+              {b.cedula && <div className="mt-1 font-mono text-xs text-[#667085]">{b.cedula}</div>}
             </div>
             {b.cargo && (
               <div className="mt-2">

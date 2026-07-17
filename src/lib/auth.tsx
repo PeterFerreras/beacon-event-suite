@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setUser(null);
     },
-    canAccess: (module) => !!user && accessByRole[user.rol].includes(module),
+    canAccess: (module) => !!user && (accessByRole[user.rol] ?? []).includes(module),
   }), [loading, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -84,3 +84,16 @@ export function firstAllowedPath(user: AuthUser | null) {
   return "/dashboard";
 }
 
+export function moduleForPath(pathname: string): AppModule | null {
+  if (pathname.startsWith("/dashboard")) return "dashboard";
+  if (pathname.startsWith("/visitantes")) return "visitantes";
+  if (pathname.startsWith("/registro")) return "registro";
+  if (pathname.startsWith("/eventos")) return "eventos";
+  if (pathname.startsWith("/invitados")) return "invitados";
+  if (pathname.startsWith("/etiquetas")) return "etiquetas";
+  if (pathname.startsWith("/reportes")) return "reportes";
+  if (pathname.startsWith("/configuracion")) return "configuracion";
+  if (pathname.startsWith("/usuarios")) return "usuarios";
+  if (pathname.startsWith("/asistencia")) return "asistencia";
+  return null;
+}

@@ -23,14 +23,14 @@ export const Route = createFileRoute("/_app/usuarios")({
 function Usuarios() {
   const { canAccess } = useAuth();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ nombre: "", correo: "", rol: "Gestor de visitantes" as UserRole, password: "Temp1234!" });
+  const [form, setForm] = useState({ nombre: "", correo: "", rol: "Gestor de visitantes" as UserRole, password: "123" });
   const { data: users = [], isLoading } = useQuery({ queryKey: ["users"], queryFn: apiClient.users, enabled: canAccess("usuarios") });
 
   const createUser = useMutation({
     mutationFn: apiClient.createUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      setForm({ nombre: "", correo: "", rol: "Gestor de visitantes", password: "Temp1234!" });
+      setForm({ nombre: "", correo: "", rol: "Gestor de visitantes", password: "123" });
       toast.success("Usuario creado");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "No se pudo crear el usuario"),
@@ -93,7 +93,7 @@ function Usuarios() {
 function UserRow({ user, onSave, onReset }: { user: AdminUser; onSave: (payload: { rol: UserRole; activo: boolean }) => void; onReset: (password: string) => void }) {
   const [rol, setRol] = useState<UserRole>(user.rol);
   const [activo, setActivo] = useState(Boolean(Number(user.activo)));
-  const [password, setPassword] = useState("Temp1234!");
+  const [password, setPassword] = useState("123");
   return (
     <TableRow>
       <TableCell><div className="font-medium text-foreground">{user.nombre}</div><div className="text-xs text-muted-foreground">{user.id}</div></TableCell>
@@ -104,4 +104,3 @@ function UserRow({ user, onSave, onReset }: { user: AdminUser; onSave: (payload:
     </TableRow>
   );
 }
-

@@ -15,8 +15,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [correo, setCorreo] = useState("admin@costadelfaro.local");
-  const [password, setPassword] = useState("Admin1234!");
+  const [correo, setCorreo] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event: React.FormEvent) {
@@ -137,7 +137,7 @@ function LoginPage() {
                     onChange={(e) => setCorreo(e.target.value)}
                     className="h-11 pl-9"
                     autoComplete="username"
-                    placeholder="nombre@costadelfaro.local"
+                    placeholder="Correo"
                   />
                 </div>
               </div>
@@ -161,7 +161,7 @@ function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="h-11 pl-9"
                     autoComplete="current-password"
-                    placeholder="••••••••"
+                    placeholder="Contraseña"
                   />
                 </div>
               </div>
@@ -175,20 +175,6 @@ function LoginPage() {
                 {loading ? "Ingresando..." : "Entrar al panel"}
               </Button>
             </form>
-
-            <div className="my-6 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              <span className="h-px flex-1 bg-border" />
-              Demo
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              <div className="font-semibold text-foreground">Usuario inicial</div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono">
-                <span>admin@costadelfaro.local</span>
-                <span className="text-accent">Admin1234!</span>
-              </div>
-            </div>
 
             <p className="mt-8 text-center text-xs text-muted-foreground">
               Sistema protegido · Uso exclusivo del personal autorizado
