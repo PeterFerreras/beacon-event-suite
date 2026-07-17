@@ -9,9 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppVisitantesRouteImport } from './routes/_app.visitantes'
+import { Route as AppUsuariosRouteImport } from './routes/_app.usuarios'
 import { Route as AppReportesRouteImport } from './routes/_app.reportes'
 import { Route as AppRegistroRouteImport } from './routes/_app.registro'
 import { Route as AppInvitadosRouteImport } from './routes/_app.invitados'
@@ -22,6 +24,11 @@ import { Route as AppConfiguracionRouteImport } from './routes/_app.configuracio
 import { Route as AppAsistenciaRouteImport } from './routes/_app.asistencia'
 import { Route as AppEventosEventIdRouteImport } from './routes/_app.eventos.$eventId'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -34,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppVisitantesRoute = AppVisitantesRouteImport.update({
   id: '/visitantes',
   path: '/visitantes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsuariosRoute = AppUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
   getParentRoute: () => AppRoute,
 } as any)
 const AppReportesRoute = AppReportesRouteImport.update({
@@ -84,6 +96,7 @@ const AppEventosEventIdRoute = AppEventosEventIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/asistencia': typeof AppAsistenciaRoute
   '/configuracion': typeof AppConfiguracionRoute
   '/dashboard': typeof AppDashboardRoute
@@ -92,11 +105,13 @@ export interface FileRoutesByFullPath {
   '/invitados': typeof AppInvitadosRoute
   '/registro': typeof AppRegistroRoute
   '/reportes': typeof AppReportesRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/visitantes': typeof AppVisitantesRoute
   '/eventos/$eventId': typeof AppEventosEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/asistencia': typeof AppAsistenciaRoute
   '/configuracion': typeof AppConfiguracionRoute
   '/dashboard': typeof AppDashboardRoute
@@ -105,6 +120,7 @@ export interface FileRoutesByTo {
   '/invitados': typeof AppInvitadosRoute
   '/registro': typeof AppRegistroRoute
   '/reportes': typeof AppReportesRoute
+  '/usuarios': typeof AppUsuariosRoute
   '/visitantes': typeof AppVisitantesRoute
   '/eventos/$eventId': typeof AppEventosEventIdRoute
 }
@@ -112,6 +128,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
   '/_app/asistencia': typeof AppAsistenciaRoute
   '/_app/configuracion': typeof AppConfiguracionRoute
   '/_app/dashboard': typeof AppDashboardRoute
@@ -120,6 +137,7 @@ export interface FileRoutesById {
   '/_app/invitados': typeof AppInvitadosRoute
   '/_app/registro': typeof AppRegistroRoute
   '/_app/reportes': typeof AppReportesRoute
+  '/_app/usuarios': typeof AppUsuariosRoute
   '/_app/visitantes': typeof AppVisitantesRoute
   '/_app/eventos/$eventId': typeof AppEventosEventIdRoute
 }
@@ -127,6 +145,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/asistencia'
     | '/configuracion'
     | '/dashboard'
@@ -135,11 +154,13 @@ export interface FileRouteTypes {
     | '/invitados'
     | '/registro'
     | '/reportes'
+    | '/usuarios'
     | '/visitantes'
     | '/eventos/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
     | '/asistencia'
     | '/configuracion'
     | '/dashboard'
@@ -148,12 +169,14 @@ export interface FileRouteTypes {
     | '/invitados'
     | '/registro'
     | '/reportes'
+    | '/usuarios'
     | '/visitantes'
     | '/eventos/$eventId'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/login'
     | '/_app/asistencia'
     | '/_app/configuracion'
     | '/_app/dashboard'
@@ -162,6 +185,7 @@ export interface FileRouteTypes {
     | '/_app/invitados'
     | '/_app/registro'
     | '/_app/reportes'
+    | '/_app/usuarios'
     | '/_app/visitantes'
     | '/_app/eventos/$eventId'
   fileRoutesById: FileRoutesById
@@ -169,10 +193,18 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -192,6 +224,13 @@ declare module '@tanstack/react-router' {
       path: '/visitantes'
       fullPath: '/visitantes'
       preLoaderRoute: typeof AppVisitantesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/usuarios': {
+      id: '/_app/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof AppUsuariosRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/reportes': {
@@ -281,6 +320,7 @@ interface AppRouteChildren {
   AppInvitadosRoute: typeof AppInvitadosRoute
   AppRegistroRoute: typeof AppRegistroRoute
   AppReportesRoute: typeof AppReportesRoute
+  AppUsuariosRoute: typeof AppUsuariosRoute
   AppVisitantesRoute: typeof AppVisitantesRoute
 }
 
@@ -293,6 +333,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInvitadosRoute: AppInvitadosRoute,
   AppRegistroRoute: AppRegistroRoute,
   AppReportesRoute: AppReportesRoute,
+  AppUsuariosRoute: AppUsuariosRoute,
   AppVisitantesRoute: AppVisitantesRoute,
 }
 
@@ -301,6 +342,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

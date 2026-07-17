@@ -1,0 +1,86 @@
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { apiClient, type AuthUser, type UserRole } from "@/lib/api";
+
+type AuthContextValue = {
+  user: AuthUser | null;
+  token: string | null;
+  loading: boolean;
+  login: (correo: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  canAccess: (module: AppModule) => boolean;
+};
+
+export type AppModule = "dashboard" | "visitantes" | "registro" | "eventos" | "invitados" | "etiquetas" | "reportes" | "configuracion" | "usuarios" | "asistencia";
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+const accessByRole: Record<UserRole, AppModule[]> = {
+  Administrador: ["dashboard", "visitantes", "registro", "eventos", "invitados", "etiquetas", "reportes", "configuracion", "usuarios", "asistencia"],
+  "Gestor de eventos": ["dashboard", "eventos", "invitados", "etiquetas"],
+  "Gestor de visitantes": ["dashboard", "visitantes", "registro", "etiquetas"],
+};
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [token, setToken] = useState<string | null>(() => (typeof window === "undefined" ? null : window.localStorage.getItem("cf-auth-token")));
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem("cf-auth-user");
+    return raw ? JSON.parse(raw) as AuthUser : null;
+  });
+  const [loading, setLoading] = useState(!!token);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    apiClient.me()
+      .then((next) => {
+        setUser(next);
+        window.localStorage.setItem("cf-auth-user", JSON.stringify(next));
+      })
+      .catch(() => {
+        window.localStorage.removeItem("cf-auth-token");
+        window.localStorage.removeItem("cf-auth-user");
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const value = useMemo<AuthContextValue>(() => ({
+    user,
+    token,
+    loading,
+    login: async (correo, password) => {
+      const data = await apiClient.login({ correo, password });
+      window.localStorage.setItem("cf-auth-token", data.token);
+      window.localStorage.setItem("cf-auth-user", JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+    },
+    logout: async () => {
+      try { await apiClient.logout(); } catch { /* La salida local sigue siendo válida. */ }
+      window.localStorage.removeItem("cf-auth-token");
+      window.localStorage.removeItem("cf-auth-user");
+      setToken(null);
+      setUser(null);
+    },
+    canAccess: (module) => !!user && accessByRole[user.rol].includes(module),
+  }), [loading, token, user]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth debe usarse dentro de AuthProvider");
+  return ctx;
+}
+
+export function firstAllowedPath(user: AuthUser | null) {
+  if (!user) return "/login";
+  if (user.rol === "Gestor de visitantes") return "/dashboard";
+  return "/dashboard";
+}
+

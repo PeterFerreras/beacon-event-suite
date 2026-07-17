@@ -3,6 +3,7 @@ import {
   CalendarDays,
   FileBarChart,
   LayoutDashboard,
+  LogOut,
   Moon,
   Search,
   Sun,
@@ -13,19 +14,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth, type AppModule } from "@/lib/auth";
+import { useNavigate } from "@tanstack/react-router";
 
 const nav = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Visitantes", url: "/visitantes", icon: Users },
-  { title: "Eventos", url: "/eventos", icon: CalendarDays },
-  { title: "Invitados", url: "/invitados", icon: UserCheck },
-  { title: "Etiquetas", url: "/etiquetas", icon: Tag },
-  { title: "Reportes", url: "/reportes", icon: FileBarChart },
-];
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { title: "Visitantes", url: "/visitantes", icon: Users, module: "visitantes" },
+  { title: "Eventos", url: "/eventos", icon: CalendarDays, module: "eventos" },
+  { title: "Invitados", url: "/invitados", icon: UserCheck, module: "invitados" },
+  { title: "Etiquetas", url: "/etiquetas", icon: Tag, module: "etiquetas" },
+  { title: "Usuarios", url: "/usuarios", icon: UserCheck, module: "usuarios" },
+  { title: "Reportes", url: "/reportes", icon: FileBarChart, module: "reportes" },
+] as const;
 
 export function AppHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { theme, toggleTheme } = useTheme();
+  const { user, logout, canAccess } = useAuth();
+  const navigate = useNavigate();
+  const visibleNav = nav.filter((item) => canAccess(item.module as AppModule));
+
+  async function handleLogout() {
+    await logout();
+    navigate({ to: "/login" });
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-gradient-hero text-white shadow-elegant">
@@ -65,13 +77,16 @@ export function AppHeader() {
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <div className="hidden h-11 w-11 place-items-center rounded-xl border border-brand-yellow/40 bg-white/10 text-xs font-semibold text-brand-yellow sm:grid">
-              SDE
+              {user?.nombre?.slice(0, 2).toUpperCase() ?? "CF"}
             </div>
+            <Button type="button" variant="ghost" size="icon" onClick={handleLogout} className="h-11 w-11 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white" aria-label="Cerrar sesión" title="Cerrar sesión">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
         <nav className="-mx-1 flex gap-2 overflow-x-auto pb-1">
-          {nav.map((item) => {
+          {visibleNav.map((item) => {
             const active = pathname === item.url || pathname.startsWith(item.url + "/");
             return (
               <Link

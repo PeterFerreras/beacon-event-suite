@@ -6,6 +6,9 @@ export type EventItem = { id: string; nombre: string; descripcion?: string | nul
 export type GuestConfirmation = "aceptado" | "tentativo" | "rechazado" | "pendiente";
 export type Guest = { id: string; eventoId: string; nombre: string; cedula: string; cargo: string; institucion: string; correo: string; tipo: string; confirmacion: GuestConfirmation; llegada?: string | null; salida?: string | null; esVisitante?: boolean };
 export type DashboardStats = { visitantesHoy: number; eventosActivos: number; invitadosConfirmados: number; presentesHoy: number; visitantesDentro: number; proximosEventos: number };
+export type UserRole = "Administrador" | "Gestor de eventos" | "Gestor de visitantes";
+export type AuthUser = { id: string; nombre: string; correo: string; rol: UserRole };
+export type AdminUser = AuthUser & { activo: boolean | number; creado?: string };
 export type NewEventPayload = { nombre: string; descripcion?: string; lugar?: string; fecha: string; fechaFin?: string; inicio?: string | null; fin?: string | null; estado?: EventStatus; requiereConfirmacion?: boolean };
 export type UpdateEventPayload = Partial<Pick<EventItem, "nombre" | "descripcion" | "lugar" | "estado" | "requiereConfirmacion">> & { fechaInicio?: string; fechaFin?: string };
 export type VisitorPayload = { cedula: string; nombre: string; cargo: string; institucion: string; area: string; telefono: string; correo: string; motivo: string; acompanantes?: { nombre: string; cedula: string }[] };
@@ -16,7 +19,8 @@ const API_URL = (
 ).replace(/\/$/, "");
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers: { "Content-Type": "application/json", ...options.headers } });
+  const token = typeof window === "undefined" ? "" : window.localStorage.getItem("cf-auth-token");
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } });
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.detail || data?.error || "No se pudo completar la solicitud.");
@@ -30,6 +34,9 @@ export const padronFotoUrl = (cedula: string) => {
 };
 
 export const apiClient = {
+  login: (payload: { correo: string; password: string }) => api<{ token: string; user: AuthUser }>("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+  logout: () => api<{ ok: boolean }>("/auth/logout", { method: "POST", body: "{}" }),
+  me: () => api<AuthUser>("/auth/me"),
   dashboard: () => api<DashboardStats>("/dashboard"),
   events: () => api<EventItem[]>("/events"),
   event: (id: string) => api<EventItem>(`/events/${id}`),
@@ -47,7 +54,10 @@ export const apiClient = {
   createVisitor: (payload: VisitorPayload) => api<Visitor>("/visitors", { method: "POST", body: JSON.stringify(payload) }),
   exitVisitor: (id: string) => api<{ updated: boolean }>(`/visitors/${id}/exit`, { method: "POST", body: "{}" }),
   settings: () => api<Record<string, string>>("/settings"),
-  users: () => api<{ id: string; nombre: string; rol: string; correo: string }[]>("/users"),
+  users: () => api<AdminUser[]>("/users"),
+  createUser: (payload: { nombre: string; correo: string; rol: UserRole; password?: string }) => api<AdminUser>("/users", { method: "POST", body: JSON.stringify(payload) }),
+  updateUser: (id: string, payload: Partial<{ nombre: string; correo: string; rol: UserRole; activo: boolean }>) => api<AdminUser>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  resetUserPassword: (id: string, password: string) => api<{ updated: boolean; temporaryPassword: string }>(`/users/${id}/reset-password`, { method: "POST", body: JSON.stringify({ password }) }),
   guestTypes: () => api<{ id: string; nombre: string; color?: string }[]>("/guest-types"),
   createGuestType: (nombre: string) => api<{ id: string; nombre: string }>("/guest-types", { method: "POST", body: JSON.stringify({ nombre }) }),
   report: (tipo: string, eventoId?: string) => api<{ tipo: string; items: unknown[] }>(`/reports/${tipo}${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ""}`),
