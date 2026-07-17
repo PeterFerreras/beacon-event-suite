@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, Plus, Printer, Search, Trash2, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { CedulaQrScanner, type CedulaQrResult } from "@/components/common/CedulaQrScanner";
 import { BadgePrintModal, type BadgeData } from "@/components/labels/BadgePrintModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,10 @@ function Registro() {
   });
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const handleQrScan = useCallback((result: CedulaQrResult) => {
+    setForm((current) => ({ ...current, cedula: result.cedula, nombre: result.nombre || current.nombre }));
+    toast.success("Cédula escaneada correctamente");
+  }, []);
 
   // Auto-consulta al padron cuando la cedula llega a 11 digitos
   useEffect(() => {
@@ -110,6 +115,7 @@ function Registro() {
                 <Input value={form.cedula} onChange={set("cedula")} className="mt-1.5" placeholder="11 digitos" />
               </div>
               <div><Label>Nombre completo</Label><Input value={form.nombre} onChange={set("nombre")} className="mt-1.5" /></div>
+              <div className="sm:col-span-2"><CedulaQrScanner onScan={handleQrScan} /></div>
               <div><Label>Cargo</Label><Input value={form.cargo} onChange={set("cargo")} className="mt-1.5" /></div>
               <div><Label>Institucion</Label><Input value={form.institucion} onChange={set("institucion")} className="mt-1.5" /></div>
               <div><Label>Area a visitar</Label><Input value={form.area} onChange={set("area")} className="mt-1.5" /></div>
@@ -138,12 +144,12 @@ function Registro() {
         <Card className="overflow-hidden border-t-2 border-t-accent">
           <CardHeader><CardTitle className="font-display">Foto y documento</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid aspect-square place-items-center overflow-hidden rounded-[var(--radius)] border-2 border-dashed border-primary/25 bg-primary/5 text-muted-foreground">
+            <div className="grid aspect-[4/5] max-h-[28rem] place-items-center overflow-hidden rounded-[var(--radius)] border-2 border-dashed border-primary/25 bg-primary/5 p-2 text-muted-foreground">
               {foto ? (
                 <img
                   src={foto}
                   alt={form.nombre || "Foto padron"}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full rounded-[calc(var(--radius)-4px)] object-contain object-center"
                   onError={() => setFoto(null)}
                 />
               ) : (
