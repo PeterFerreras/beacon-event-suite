@@ -59,7 +59,7 @@ export function BadgePrintModal({
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Etiqueta ${escapeHtml(badge.nombre)}</title>
+  <title>Etiqueta ${escapeHtml(b.nombre)}</title>
   <style>
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #eef6f7; font-family: Arial, sans-serif; }
     .label { width: 340px; border: 2px solid #138f8c; border-radius: 12px; background: white; padding: 20px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); color: #101828; }
@@ -78,13 +78,13 @@ export function BadgePrintModal({
 </head>
 <body>
   <section class="label">
-    <div class="top"><div class="brand">Costa del Faro</div>${badge.tipo ? `<div class="type">${escapeHtml(badge.tipo)}</div>` : ""}</div>
+    <div class="top"><div class="brand">Costa del Faro</div>${b.tipo ? `<div class="type">${escapeHtml(b.tipo)}</div>` : ""}</div>
     <div class="eyebrow">Nombre</div>
-    <h1>${escapeHtml(badge.nombre)}</h1>
-    ${badge.cargo ? `<div class="muted">${escapeHtml(badge.cargo)}</div>` : ""}
-    ${badge.institucion ? `<div class="muted">${escapeHtml(badge.institucion)}</div>` : ""}
-    ${badge.evento ? `<div class="event"><strong>Evento:</strong> ${escapeHtml(badge.evento)}</div>` : ""}
-    <div class="bottom"><div><div class="eyebrow">ID</div><div class="id">${escapeHtml(badge.id.toUpperCase())}</div></div><div class="qr">${qr}</div></div>
+    <h1>${escapeHtml(b.nombre)}</h1>
+    ${b.cargo ? `<div class="muted">${escapeHtml(b.cargo)}</div>` : ""}
+    ${b.institucion ? `<div class="muted">${escapeHtml(b.institucion)}</div>` : ""}
+    ${b.evento ? `<div class="event"><strong>Evento:</strong> ${escapeHtml(b.evento)}</div>` : ""}
+    <div class="bottom"><div><div class="eyebrow">ID</div><div class="id">${escapeHtml(b.id.toUpperCase())}</div></div><div class="qr">${qr}</div></div>
   </section>
 </body>
 </html>`;
@@ -92,7 +92,7 @@ export function BadgePrintModal({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `etiqueta-${safeName || badge.id}.html`;
+    link.download = `etiqueta-${safeName || b.id}.html`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -112,41 +112,41 @@ export function BadgePrintModal({
                 <img src="/logo-cf.png" alt="Costa del Faro" className="h-8 w-auto" />
                 <div className="text-[10px] font-semibold uppercase tracking-widest text-[#138f8c]">Costa del Faro</div>
               </div>
-              {badge.tipo && (
+              {b.tipo && (
                 <span className="rounded-full bg-[#ff6b13] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                  {badge.tipo}
+                  {b.tipo}
                 </span>
               )}
             </div>
             <div className="mt-4 min-h-[3.5rem]">
               <div className="text-[10px] uppercase tracking-widest text-[#667085]">Nombre</div>
-              <div className="font-display text-xl font-semibold leading-tight text-[#101828]">{badge.nombre}</div>
+              <div className="font-display text-xl font-semibold leading-tight text-[#101828]">{b.nombre}</div>
             </div>
-            {badge.cargo && (
+            {b.cargo && (
               <div className="mt-2">
                 <div className="text-[10px] uppercase tracking-widest text-[#667085]">Cargo</div>
-                <div className="text-sm font-medium text-[#101828]">{badge.cargo}</div>
+                <div className="text-sm font-medium text-[#101828]">{b.cargo}</div>
               </div>
             )}
-            {badge.institucion && (
+            {b.institucion && (
               <div className="mt-2">
                 <div className="text-[10px] uppercase tracking-widest text-[#667085]">Institucion</div>
-                <div className="text-sm text-[#101828]">{badge.institucion}</div>
+                <div className="text-sm text-[#101828]">{b.institucion}</div>
               </div>
             )}
-            {badge.evento && (
+            {b.evento && (
               <div className="mt-3 border-t border-dashed border-[#cbd5e1] pt-2 text-xs text-[#667085]">
-                <span className="font-medium text-[#138f8c]">Evento:</span> {badge.evento}
+                <span className="font-medium text-[#138f8c]">Evento:</span> {b.evento}
               </div>
             )}
             <div className="mt-4 flex items-center justify-between">
               <div className="min-w-0 pr-3 text-[10px] leading-tight text-[#667085]">
                 <div>ID</div>
-                <div className="break-all font-mono text-xs text-[#101828]">{badge.id.toUpperCase()}</div>
+                <div className="break-all font-mono text-xs text-[#101828]">{b.id.toUpperCase()}</div>
               </div>
               <div
                 className="h-28 w-28 shrink-0 bg-white [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
-                aria-label={`Codigo QR de ${badge.nombre}`}
+                aria-label={`Codigo QR de ${b.nombre}`}
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             </div>
