@@ -5,14 +5,17 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import basicSsl from "@vitejs/plugin-basic-ssl";
+
+const useHttps = process.env.npm_lifecycle_event === "dev:https";
 
 export default defineConfig({
   vite: {
+    plugins: useHttps ? [basicSsl()] : [],
     server: {
-      allowedHosts: [".trycloudflare.com"],
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:8080",
+          target: process.env.VITE_API_PROXY_TARGET ?? "http://127.0.0.1:8081",
           changeOrigin: true,
         },
       },

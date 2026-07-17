@@ -10,7 +10,10 @@ export type NewEventPayload = { nombre: string; descripcion?: string; lugar?: st
 export type UpdateEventPayload = Partial<Pick<EventItem, "nombre" | "descripcion" | "lugar" | "estado" | "requiereConfirmacion">> & { fechaInicio?: string; fechaFin?: string };
 export type VisitorPayload = { cedula: string; nombre: string; cargo: string; institucion: string; area: string; telefono: string; correo: string; motivo: string; acompanantes?: { nombre: string; cedula: string }[] };
 export type PadronPersona = { cedula: string; nombre: string; foto?: string | null; estado?: string | null; provincia?: string | null; municipio?: string | null; fechaNacimiento?: string | null; edad?: number | null; sexo?: string | null; nacionalidad?: string | null; fuente?: string };
-const API_URL = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
+const API_URL = (
+  import.meta.env.VITE_API_URL ??
+  (typeof window === "undefined" ? "http://127.0.0.1:8081/api" : `${window.location.origin}/api`)
+).replace(/\/$/, "");
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { ...options, headers: { "Content-Type": "application/json", ...options.headers } });

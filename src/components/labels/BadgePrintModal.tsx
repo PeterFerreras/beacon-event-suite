@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QrMock } from "@/components/common/QrMock";
 import { Download, Printer } from "lucide-react";
+import QRCode from "qrcode";
+import { useEffect, useMemo, useState } from "react";
 
 export type BadgeData = {
   nombre: string;
@@ -21,11 +22,37 @@ export function BadgePrintModal({
   onOpenChange: (v: boolean) => void;
   data: BadgeData | null;
 }) {
-  if (!data) return null;
   const badge = data;
+  const qrValue = useMemo(() => JSON.stringify({ id: badge?.id ?? "", nombre: badge?.nombre ?? "", evento: badge?.evento ?? "" }), [badge]);
+  const [qrSvg, setQrSvg] = useState("");
 
-  function downloadLabel() {
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toString(qrValue, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 128,
+      color: { dark: "#101828", light: "#ffffff" },
+    }).then((svg) => {
+      if (!cancelled) setQrSvg(svg);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrValue]);
+
+  if (!badge) return null;
+
+  async function downloadLabel() {
     const safeName = badge.nombre.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const qr = await QRCode.toString(qrValue, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 104,
+      color: { dark: "#101828", light: "#ffffff" },
+    });
     const html = `<!doctype html>
 <html>
 <head>
@@ -43,7 +70,8 @@ export function BadgePrintModal({
     .event { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: 12px; color: #475467; }
     .bottom { margin-top: 18px; display: flex; align-items: center; justify-content: space-between; }
     .id { font-family: monospace; font-size: 12px; }
-    .qr { width: 92px; height: 92px; border: 2px solid #101828; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+    .qr { width: 104px; height: 104px; background: #fff; }
+    .qr svg { display: block; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
@@ -54,7 +82,7 @@ export function BadgePrintModal({
     ${badge.cargo ? `<div class="muted">${escapeHtml(badge.cargo)}</div>` : ""}
     ${badge.institucion ? `<div class="muted">${escapeHtml(badge.institucion)}</div>` : ""}
     ${badge.evento ? `<div class="event"><strong>Evento:</strong> ${escapeHtml(badge.evento)}</div>` : ""}
-    <div class="bottom"><div><div class="eyebrow">ID</div><div class="id">${escapeHtml(badge.id.toUpperCase())}</div></div><div class="qr">QR</div></div>
+    <div class="bottom"><div><div class="eyebrow">ID</div><div class="id">${escapeHtml(badge.id.toUpperCase())}</div></div><div class="qr">${qr}</div></div>
   </section>
 </body>
 </html>`;
@@ -76,45 +104,49 @@ export function BadgePrintModal({
           <DialogTitle className="font-display">Etiqueta de identificacion</DialogTitle>
         </DialogHeader>
         <div className="print-area">
-          <div className="mx-auto w-[340px] rounded-[var(--radius)] border-2 border-primary bg-white p-5 shadow-card-soft">
+          <div className="mx-auto w-[340px] rounded-[var(--radius)] border-2 border-[#138f8c] bg-white p-5 text-[#101828] shadow-card-soft">
             <div className="flex items-center justify-between border-b-2 border-accent pb-2">
               <div className="flex items-center gap-2">
                 <img src="/logo-cf.png" alt="Costa del Faro" className="h-8 w-auto" />
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-primary">Costa del Faro</div>
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-[#138f8c]">Costa del Faro</div>
               </div>
               {badge.tipo && (
-                <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-foreground">
+                <span className="rounded-full bg-[#ff6b13] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                   {badge.tipo}
                 </span>
               )}
             </div>
             <div className="mt-4 min-h-[3.5rem]">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Nombre</div>
-              <div className="font-display text-xl font-semibold leading-tight text-foreground">{badge.nombre}</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#667085]">Nombre</div>
+              <div className="font-display text-xl font-semibold leading-tight text-[#101828]">{badge.nombre}</div>
             </div>
             {badge.cargo && (
               <div className="mt-2">
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Cargo</div>
-                <div className="text-sm font-medium text-foreground">{badge.cargo}</div>
+                <div className="text-[10px] uppercase tracking-widest text-[#667085]">Cargo</div>
+                <div className="text-sm font-medium text-[#101828]">{badge.cargo}</div>
               </div>
             )}
             {badge.institucion && (
               <div className="mt-2">
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Institucion</div>
-                <div className="text-sm text-foreground">{badge.institucion}</div>
+                <div className="text-[10px] uppercase tracking-widest text-[#667085]">Institucion</div>
+                <div className="text-sm text-[#101828]">{badge.institucion}</div>
               </div>
             )}
             {badge.evento && (
-              <div className="mt-3 border-t border-dashed pt-2 text-xs text-muted-foreground">
-                <span className="font-medium text-primary">Evento:</span> {badge.evento}
+              <div className="mt-3 border-t border-dashed border-[#cbd5e1] pt-2 text-xs text-[#667085]">
+                <span className="font-medium text-[#138f8c]">Evento:</span> {badge.evento}
               </div>
             )}
             <div className="mt-4 flex items-center justify-between">
-              <div className="text-[10px] leading-tight text-muted-foreground">
+              <div className="min-w-0 pr-3 text-[10px] leading-tight text-[#667085]">
                 <div>ID</div>
-                <div className="font-mono text-xs text-foreground">{badge.id.toUpperCase()}</div>
+                <div className="break-all font-mono text-xs text-[#101828]">{badge.id.toUpperCase()}</div>
               </div>
-              <QrMock value={badge.id} size={96} />
+              <div
+                className="h-28 w-28 shrink-0 bg-white [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
+                aria-label={`Codigo QR de ${badge.nombre}`}
+                dangerouslySetInnerHTML={{ __html: qrSvg }}
+              />
             </div>
           </div>
         </div>
