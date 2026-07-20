@@ -190,6 +190,7 @@ function Visitantes() {
                           onClick={() => {
                             setBadge({
                               id: v.id,
+                              cedula: v.cedula,
                               nombre: v.nombre,
                               cargo: v.cargo,
                               institucion: v.institucion,

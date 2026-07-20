@@ -103,6 +103,7 @@ function EventDetail() {
       invalidate();
       setBadge({
         id: attendee.id,
+        cedula: attendee.cedula,
         nombre: attendee.nombre,
         cargo: attendee.cargo,
         institucion: attendee.institucion,
@@ -144,6 +145,7 @@ function EventDetail() {
       setVisitorForm({ nombre: "", cedula: "", cargo: "", institucion: "", correo: "" });
       setBadge({
         id: next.id,
+        cedula: next.cedula,
         nombre: next.nombre,
         cargo: next.cargo,
         institucion: next.institucion,
@@ -577,6 +579,7 @@ function EventDetail() {
                             onClick={() => {
                               setBadge({
                                 id: attendee.id,
+                                cedula: attendee.cedula,
                                 nombre: attendee.nombre,
                                 cargo: attendee.cargo,
                                 institucion: attendee.institucion,
