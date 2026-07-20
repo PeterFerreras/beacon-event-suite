@@ -639,6 +639,11 @@ function EventDetail() {
                 <Input
                   value={visitorForm.cedula}
                   onChange={(inputEvent) => setVisitorField("cedula", inputEvent.target.value)}
+                  onKeyDown={(inputEvent) => {
+                    if (inputEvent.key !== "Enter") return;
+                    inputEvent.preventDefault();
+                    consultarCedula();
+                  }}
                 />
 
                 <Button
