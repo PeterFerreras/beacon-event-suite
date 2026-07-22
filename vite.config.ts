@@ -8,8 +8,10 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 
 const useHttps = process.env.npm_lifecycle_event === "dev:https";
+const isMonsterAspBuild = process.env.MONSTERASP_BUILD === "1";
 
 export default defineConfig({
+  nitro: isMonsterAspBuild ? false : true,
   vite: {
     plugins: useHttps ? [basicSsl()] : [],
     server: {
@@ -22,6 +24,8 @@ export default defineConfig({
     },
   },
   tanstackStart: {
+    // MonsterASP sirve el frontend como archivos estaticos desde IIS.
+    spa: { enabled: isMonsterAspBuild },
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },

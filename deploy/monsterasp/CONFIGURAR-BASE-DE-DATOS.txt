@@ -1,0 +1,34 @@
+CONFIGURACION MYSQL PARA MONSTERASP
+==================================
+
+1. En wwwroot/backend, copia el archivo .env.example con el nombre .env
+2. Abre .env y reemplaza los valores siguientes con los datos del panel MySQL de MonsterASP:
+
+APP_DEBUG=false
+CORS_ORIGIN=https://TU-DOMINIO.runasp.net
+
+DB_HOST=HOST-MYSQL-DE-MONSTERASP
+DB_PORT=3306
+DB_NAME=NOMBRE-DE-LA-BASE
+DB_USER=USUARIO-DE-LA-BASE
+DB_PASS=CONTRASENA-DE-LA-BASE
+DB_TIMEOUT=10
+
+Ejemplo de estructura (NO copies estos valores literalmente):
+
+APP_DEBUG=false
+CORS_ORIGIN=https://mi-sitio.runasp.net
+DB_HOST=mysqlXXX.siteasp.net
+DB_PORT=3306
+DB_NAME=mi_base
+DB_USER=mi_usuario
+DB_PASS=mi_contrasena_segura
+DB_TIMEOUT=10
+
+IMPORTANTE
+----------
+- No agregues espacios alrededor del signo =
+- No subas .env a GitHub.
+- Usa el host MySQL indicado por MonsterASP; normalmente no es localhost.
+- Importa primero backend/database/schema.sql y despues backend/database/seed.sql.
+- Verifica la conexion abriendo https://TU-DOMINIO/api/health
