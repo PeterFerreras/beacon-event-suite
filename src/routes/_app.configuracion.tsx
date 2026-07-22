@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -23,6 +23,8 @@ export const Route = createFileRoute("/_app/configuracion")({
 function Configuracion() {
   const queryClient = useQueryClient();
   const [newType, setNewType] = useState("");
+  const [labelSize, setLabelSize] = useState("101.6x50.8");
+  const [defaultPrinter, setDefaultPrinter] = useState("");
   const { data: settings = {} } = useQuery({ queryKey: ["settings"], queryFn: apiClient.settings });
   const { data: usuarios = [] } = useQuery({ queryKey: ["users"], queryFn: apiClient.users });
   const { data: tipos = [] } = useQuery({ queryKey: ["guest-types"], queryFn: apiClient.guestTypes });
@@ -33,6 +35,18 @@ function Configuracion() {
       queryClient.invalidateQueries({ queryKey: ["guest-types"] });
       toast.success("Tipo agregado");
     },
+  });
+  useEffect(() => {
+    setLabelSize(settings.label_size ?? "101.6x50.8");
+    setDefaultPrinter(settings.default_printer ?? "");
+  }, [settings.label_size, settings.default_printer]);
+  const savePrintSettings = useMutation({
+    mutationFn: () => apiClient.updateSettings({ label_size: labelSize, default_printer: defaultPrinter }),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["settings"], saved);
+      toast.success("Configuracion de impresion guardada");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo guardar"),
   });
   return (
     <div>
@@ -89,17 +103,19 @@ function Configuracion() {
         <TabsContent value="impresion" className="mt-4">
           <Card className="overflow-hidden border-t-2 border-t-primary"><CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
             <div><Label>Tamano de etiqueta</Label>
-              <Select defaultValue="105x74"><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <Select value={labelSize} onValueChange={setLabelSize}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="101.6x50.8">Etiqueta 4 x 2 pulgadas</SelectItem>
                   <SelectItem value="105x74">A7 - 105x74 mm</SelectItem>
                   <SelectItem value="90x54">Credencial - 90x54 mm</SelectItem>
                   <SelectItem value="100x150">Adhesivo - 100x150 mm</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Impresora predeterminada</Label><Input defaultValue={settings.default_printer ?? ""} className="mt-1.5" /></div>
+            <div><Label>Impresora predeterminada</Label><Input value={defaultPrinter} onChange={(event) => setDefaultPrinter(event.target.value)} className="mt-1.5" /></div>
             <div className="flex items-center gap-3 pt-6"><Switch id="qr" defaultChecked={settings.include_qr !== "0"} /><Label htmlFor="qr">Incluir codigo QR</Label></div>
             <div className="flex items-center gap-3 pt-6"><Switch id="foto" defaultChecked={settings.include_photo === "1"} /><Label htmlFor="foto">Incluir foto del visitante</Label></div>
+            <div className="sm:col-span-2"><Button onClick={() => savePrintSettings.mutate()} disabled={savePrintSettings.isPending}>{savePrintSettings.isPending ? "Guardando..." : "Guardar configuracion de impresion"}</Button></div>
           </CardContent></Card>
         </TabsContent>
 

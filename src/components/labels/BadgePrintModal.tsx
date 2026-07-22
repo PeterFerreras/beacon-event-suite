@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type BadgeData = {
   nombre: string;
@@ -26,6 +26,7 @@ export function BadgePrintModal({
   const badge = data;
   const qrValue = useMemo(() => JSON.stringify({ id: badge?.id ?? "", cedula: badge?.cedula ?? badge?.id ?? "", nombre: badge?.nombre ?? "", evento: badge?.evento ?? "" }), [badge]);
   const [qrSvg, setQrSvg] = useState("");
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +46,80 @@ export function BadgePrintModal({
 
   if (!badge) return null;
   const b = badge;
+
+  function printLabel() {
+    const logoUrl = new URL("/logo-cf.png", window.location.href).href;
+    const printMarkup = `<main class="label">
+      <header>
+        <div class="brand"><img src="${logoUrl}" alt="Costa del Faro"><span>COSTA DEL FARO</span></div>
+        ${b.tipo ? `<span class="type">${escapeHtml(b.tipo)}</span>` : ""}
+      </header>
+      <section class="content">
+        <div class="details">
+          <div class="caption">NOMBRE</div>
+          <div class="name">${escapeHtml(b.nombre)}</div>
+          ${b.cedula ? `<div class="document">${escapeHtml(b.cedula)}</div>` : ""}
+          ${b.evento ? `<div class="event"><span>Evento:</span> ${escapeHtml(b.evento)}</div>` : ""}
+          <div class="caption id-caption">ID</div>
+          <div class="id">${escapeHtml(b.id.toUpperCase())}</div>
+        </div>
+        <div class="qr">${qrSvg}</div>
+      </section>
+    </main>`;
+    const printCss = `<style>
+      @page { size: 4in 2in; margin: 0; }
+      * { box-sizing: border-box; }
+      html, body { width: 4in; height: 2in; margin: 0; padding: 0; overflow: hidden; }
+      body { font-family: Arial, sans-serif; color: #101828; direction: ltr; writing-mode: horizontal-tb; }
+      .label { position: absolute; inset: 0; width: 4in; height: 2in; padding: 2.2mm; overflow: hidden; border: .45mm solid #667085; border-radius: 3mm; background: #fff; transform: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      header { height: 10mm; display: flex; align-items: center; justify-content: space-between; border-bottom: .6mm solid #138f8c; padding: 0 1mm 1.4mm; }
+      .brand { display: flex; align-items: center; gap: 2.5mm; color: #344054; font-size: 8pt; font-weight: 800; letter-spacing: 1.3pt; }
+      .brand img { width: 15mm; height: 7.5mm; object-fit: contain; }
+      .type { border-radius: 4mm; padding: 1.2mm 3mm; background: #667085; color: #fff; font-size: 7pt; font-weight: 800; letter-spacing: .4pt; }
+      .content { display: grid; grid-template-columns: minmax(0, 1fr) 20mm; gap: 2.5mm; padding: 2mm 1mm 0; }
+      .caption { color: #667085; font-size: 6.5pt; font-weight: 700; letter-spacing: .8pt; }
+      .name { margin-top: .5mm; font-size: 12pt; line-height: 1.02; font-weight: 900; color: #101828; }
+      .document { margin-top: 1.2mm; font: 800 10pt Consolas, monospace; color: #101828; }
+      .event { margin-top: 3mm; padding-top: 1.5mm; border-top: .3mm dashed #cbd5e1; color: #475467; font-size: 7pt; }
+      .id-caption { margin-top: 1.5mm; }
+      .id { margin-top: .5mm; font: 700 6.5pt Consolas, monospace; }
+      .qr { width: 20mm; height: 20mm; align-self: start; justify-self: end; padding: .7mm; border: .3mm solid #e4e7ec; border-radius: 1.5mm; }
+      .qr svg { display: block; width: 100%; height: 100%; }
+    </style>`;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("title", "Impresion de etiqueta 4 x 2");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+
+    let cleanupTimer: number | undefined;
+    const cleanup = () => {
+      if (cleanupTimer !== undefined) window.clearTimeout(cleanupTimer);
+      iframe.remove();
+    };
+
+    iframe.onload = () => {
+      const printWindow = iframe.contentWindow;
+      if (!printWindow) return cleanup();
+      printWindow.addEventListener("afterprint", cleanup, { once: true });
+      cleanupTimer = window.setTimeout(cleanup, 60_000);
+      window.setTimeout(() => {
+        try {
+          printWindow.focus();
+          printWindow.print();
+        } catch (error) {
+          cleanup();
+          throw error;
+        }
+      }, 250);
+    };
+    iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">${printCss}</head><body>${printMarkup}</body></html>`;
+    document.body.appendChild(iframe);
+  }
 
   async function downloadLabel() {
     const safeName = b.nombre.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
@@ -115,12 +190,12 @@ export function BadgePrintModal({
         <DialogHeader>
           <DialogTitle className="font-display">Etiqueta de identificacion</DialogTitle>
         </DialogHeader>
-        <div className="print-area">
-          <div className="mx-auto w-full max-w-[560px] rounded-[var(--radius)] border-2 border-[#138f8c] bg-white p-5 text-[#101828] shadow-card-soft">
-            <div className="flex items-center justify-between border-b-2 border-accent pb-2">
+        <div ref={printAreaRef} className="print-area">
+          <div className="ticket-card mx-auto aspect-[2/1] w-full max-w-[560px] overflow-hidden rounded-[var(--radius)] border-2 border-[#138f8c] bg-white p-5 text-[#101828] shadow-card-soft">
+            <div className="ticket-header flex items-center justify-between border-b-2 border-accent pb-2">
               <div className="flex items-center gap-2">
-                <img src="/logo-cf.png" alt="Costa del Faro" className="h-8 w-auto" />
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-[#138f8c]">Costa del Faro</div>
+                <img src="/logo-cf.png" alt="Costa del Faro" className="h-10 w-auto" />
+                <div className="text-xs font-bold uppercase tracking-widest text-[#138f8c]">Costa del Faro</div>
               </div>
               {b.tipo && (
                 <span className="rounded-full bg-[#ff6b13] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
@@ -128,12 +203,12 @@ export function BadgePrintModal({
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-5 pt-4">
-              <div className="min-w-0">
+            <div className="ticket-body grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-5 pt-4">
+              <div className="ticket-details min-w-0">
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-[#667085]">Nombre</div>
-                  <div className="font-display text-xl font-semibold leading-tight text-[#101828]">{b.nombre}</div>
-                  {b.cedula && <div className="mt-1 font-mono text-xs font-semibold text-[#101828]">{b.cedula}</div>}
+                  <div className="ticket-name font-display text-2xl font-extrabold leading-tight text-[#101828]">{b.nombre}</div>
+                  {b.cedula && <div className="mt-1 font-mono text-base font-bold text-[#101828]">{b.cedula}</div>}
                 </div>
                 {b.cargo && (
                   <div className="mt-2">
@@ -158,7 +233,7 @@ export function BadgePrintModal({
                 </div>
               </div>
               <div
-                className="h-28 w-28 shrink-0 bg-white [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
+                className="ticket-qr h-28 w-28 shrink-0 bg-white [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
                 aria-label={`Codigo QR de ${b.nombre}`}
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
@@ -169,7 +244,7 @@ export function BadgePrintModal({
           <Button variant="outline" onClick={downloadLabel}>
             <Download className="mr-2 h-4 w-4" /> Descargar etiqueta
           </Button>
-          <Button onClick={() => window.print()}>
+          <Button onClick={printLabel}>
             <Printer className="mr-2 h-4 w-4" /> Imprimir
           </Button>
         </DialogFooter>

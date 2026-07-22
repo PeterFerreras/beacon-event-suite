@@ -44,7 +44,7 @@ function route(string $method, string $path, Database $db): void { if (padron_ro
     if ($method==='POST' && $path==='/api/visitors') { require_role($user,[ROLE_VISITANTES]); create_visit($db); return; }
     if ($method==='GET' && $path==='/api/visitors/search') { require_role($user,[ROLE_VISITANTES]); search_visitors($db); return; }
     if (preg_match('#^/api/visitors/([^/]+)/exit$#',$path,$m) && $method==='POST') { require_role($user,[ROLE_VISITANTES]); close_visit($db,$m[1]); return; }
-    if ($method==='GET' && $path==='/api/settings') { require_role($user,[ROLE_ADMIN]); Response::json(settings($db)); return; }
+    if ($method==='GET' && $path==='/api/settings') { Response::json(settings($db)); return; }
     if ($method==='PATCH' && $path==='/api/settings') { require_role($user,[ROLE_ADMIN]); foreach(request_json() as $k=>$v) $db->execute('INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)',[(string)$k,is_scalar($v)?(string)$v:json_encode($v)]); Response::json(settings($db)); return; }
     if ($method==='GET' && $path==='/api/users') { require_role($user,[ROLE_ADMIN]); users_list($db); return; }
     if ($method==='POST' && $path==='/api/users') { require_role($user,[ROLE_ADMIN]); users_create($db); return; }

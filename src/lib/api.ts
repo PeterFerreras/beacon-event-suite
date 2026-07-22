@@ -217,6 +217,8 @@ export const apiClient = {
   exitVisitor: (id: string) =>
     api<{ updated: boolean }>(`/visitors/${id}/exit`, { method: "POST", body: "{}" }),
   settings: () => api<Record<string, string>>("/settings"),
+  updateSettings: (payload: Record<string, string>) =>
+    api<Record<string, string>>("/settings", { method: "PATCH", body: JSON.stringify(payload) }),
   users: () => api<AdminUser[]>("/users"),
   createUser: (payload: { nombre: string; correo: string; rol: UserRole; password?: string }) =>
     api<AdminUser>("/users", { method: "POST", body: JSON.stringify(payload) }),
