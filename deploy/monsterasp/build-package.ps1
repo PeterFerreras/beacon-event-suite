@@ -7,22 +7,22 @@ $zipPath = Join-Path $PSScriptRoot "beacon-event-suite-monsterasp.zip"
 
 Push-Location $projectRoot
 try {
-  $env:MONSTERASP_BUILD = "1"
-  & npm.cmd run build
+  & npm.cmd run build:monsterasp
   if ($LASTEXITCODE -ne 0) { throw "La compilacion del frontend fallo." }
 } finally {
-  Remove-Item Env:MONSTERASP_BUILD -ErrorAction SilentlyContinue
   Pop-Location
 }
 
 if (Test-Path $packageRoot) { Remove-Item -LiteralPath $packageRoot -Recurse -Force }
 New-Item -ItemType Directory -Path $wwwroot | Out-Null
 
-$staticOutput = Join-Path $projectRoot "dist\client"
-if (-not (Test-Path (Join-Path $staticOutput "_shell.html"))) {
-  throw "No se genero dist/client/_shell.html."
+$staticOutput = Join-Path $projectRoot "dist\monsterasp"
+$generatedHtml = Join-Path $staticOutput "index.monsterasp.html"
+if (-not (Test-Path $generatedHtml)) {
+  throw "No se genero el documento SPA de MonsterASP."
 }
 Copy-Item -Path (Join-Path $staticOutput "*") -Destination $wwwroot -Recurse -Force
+Move-Item -LiteralPath (Join-Path $wwwroot "index.monsterasp.html") -Destination (Join-Path $wwwroot "_shell.html")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "web.config") -Destination (Join-Path $wwwroot "web.config")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "CONFIGURAR-BASE-DE-DATOS.txt") -Destination (Join-Path $wwwroot "CONFIGURAR-BASE-DE-DATOS.txt")
 
