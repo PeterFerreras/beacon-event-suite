@@ -196,12 +196,12 @@ function Invitados() {
         subtitle="Administre confirmaciones tipo Outlook e imprima etiquetas de invitados."
         actions={
           <>
-            <Button variant="outline">
+            {/* <Button variant="outline">
               <Upload className="mr-2 h-4 w-4" /> Importar
             </Button>
             <Button variant="outline" onClick={() => sendInvitation()}>
               <Send className="mr-2 h-4 w-4" /> Enviar citas
-            </Button>
+            </Button> */}
             <Button
               className="bg-accent text-accent-foreground hover:opacity-90"
               onClick={() => setGuestOpen(true)}
