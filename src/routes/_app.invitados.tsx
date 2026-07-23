@@ -440,10 +440,14 @@ function Invitados() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Estandar">Estandar</SelectItem>
+                    <SelectItem value="Estandar">ESTANDAR</SelectItem>
                     <SelectItem value="VIP">VIP</SelectItem>
-                    <SelectItem value="Protocolo">Protocolo</SelectItem>
-                    <SelectItem value="Prensa">Prensa</SelectItem>
+                    <SelectItem value="Protocolo">PROTOCOLO</SelectItem>
+                    <SelectItem value="Prensa">PRENSA</SelectItem>
+                    <SelectItem value="Director (a)">DIRECTOR (A)</SelectItem>
+                    <SelectItem value="Regidor (a)">REGIDOR (A)</SelectItem>
+                    <SelectItem value="Oferente">OFERENTE</SelectItem>
+                    <SelectItem value="Junta de vecinos">JUNTA DE VECINOS</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

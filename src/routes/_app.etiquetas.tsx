@@ -4,6 +4,7 @@ import { Printer } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { QrMock } from "@/components/common/QrMock";
 import { BadgePrintModal, type BadgeData } from "@/components/labels/BadgePrintModal";
+import { InstitutionLogos } from "@/components/common/InstitutionLogos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,10 @@ const variantes = [
   { key: "Estandar", desc: "Etiqueta generica para invitados" },
   { key: "Prensa", desc: "Etiqueta para medios de comunicacion" },
   { key: "Protocolo", desc: "Etiqueta para personal de protocolo" },
+  { key: "Director (a)", desc: "Etiqueta para directores y directoras" },
+  { key: "Regidor (a)", desc: "Etiqueta para regidores y regidoras" },
+  { key: "Oferente", desc: "Etiqueta para participantes oferentes" },
+  { key: "Junta de vecinos", desc: "Etiqueta para representantes comunitarios" },
 ] as const;
 
 function Etiquetas() {
@@ -71,8 +76,8 @@ function Etiquetas() {
             <div>
               <Label>Tipo</Label>
               <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: v }))}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                <SelectContent>{variantes.map((v) => <SelectItem key={v.key} value={v.key}>{v.key}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="mt-1.5 uppercase"><SelectValue /></SelectTrigger>
+                <SelectContent>{variantes.map((v) => <SelectItem key={v.key} value={v.key} className="uppercase">{v.key}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="sm:col-span-2 flex gap-2 pt-2">
@@ -91,7 +96,7 @@ function Etiquetas() {
               {variantes.map((v) => (
                 <button key={v.key} onClick={() => setForm((f) => ({ ...f, tipo: v.key }))}
                   className={`rounded-[var(--radius)] border p-3 text-left transition ${form.tipo === v.key ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"}`}>
-                  <div className="font-medium">{v.key}</div>
+                  <div className="font-medium uppercase">{v.key}</div>
                   <div className="text-xs text-muted-foreground">{v.desc}</div>
                 </button>
               ))}
@@ -104,14 +109,14 @@ function Etiquetas() {
           <CardContent>
             <div className="mx-auto w-full max-w-[300px] rounded-[var(--radius)] border-2 border-primary bg-white p-4 shadow-card-soft">
               <div className="flex items-center justify-between border-b-2 border-accent pb-2">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-primary">Costa del Faro</div>
+                <InstitutionLogos className="h-9 w-24" />
                 <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-foreground">{form.tipo}</span>
               </div>
               <div className="mt-3 font-display text-lg font-semibold text-foreground">{form.nombre}</div>
               <div className="text-xs font-mono text-muted-foreground">{form.cedula || "Documento requerido"}</div>
               <div className="text-xs text-muted-foreground">{form.cargo}</div>
               <div className="mt-1 text-xs text-foreground">{form.institucion}</div>
-              <div className="mt-3 border-t border-dashed pt-2 text-xs text-muted-foreground">{form.evento}</div>
+              <div className="mt-3 border-t border-dashed pt-2 text-center text-base font-bold text-foreground"><span className="text-primary">Evento:</span> {form.evento}</div>
               <div className="mt-3 flex justify-center"><QrMock value={form.cedula + form.nombre + form.evento} size={100} /></div>
             </div>
           </CardContent>

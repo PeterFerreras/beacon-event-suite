@@ -49,19 +49,22 @@ export function BadgePrintModal({
 
   function printLabel() {
     const logoUrl = new URL("/logo-cf.png", window.location.href).href;
+    const asdeLogoUrl = new URL("/logo-asde.png", window.location.href).href;
     const printMarkup = `<main class="label">
       <header>
-        <div class="brand"><img src="${logoUrl}" alt="Costa del Faro"><span>COSTA DEL FARO</span></div>
-        ${b.tipo ? `<span class="type">${escapeHtml(b.tipo)}</span>` : ""}
+        <div class="brand"><span class="logo-box"><img class="asde" src="${asdeLogoUrl}" alt="Alcaldía de Santo Domingo Este"></span><i></i><span class="logo-box"><img class="costa" src="${logoUrl}" alt="Costa del Faro"></span></div>
+        ${b.tipo ? `<span class="type">${escapeHtml(b.tipo.toUpperCase())}</span>` : ""}
       </header>
       <section class="content">
         <div class="details">
           <div class="caption">NOMBRE</div>
           <div class="name">${escapeHtml(b.nombre)}</div>
           ${b.cedula ? `<div class="document">${escapeHtml(b.cedula)}</div>` : ""}
+          <div class="meta">
+            ${b.cargo ? `<div><span>CARGO</span><strong>${escapeHtml(b.cargo)}</strong></div>` : ""}
+            ${b.institucion ? `<div><span>INSTITUCIÓN</span><strong>${escapeHtml(b.institucion)}</strong></div>` : ""}
+          </div>
           ${b.evento ? `<div class="event"><span>Evento:</span> ${escapeHtml(b.evento)}</div>` : ""}
-          <div class="caption id-caption">ID</div>
-          <div class="id">${escapeHtml(b.id.toUpperCase())}</div>
         </div>
         <div class="qr">${qrSvg}</div>
       </section>
@@ -73,16 +76,22 @@ export function BadgePrintModal({
       body { font-family: Arial, sans-serif; color: #101828; direction: ltr; writing-mode: horizontal-tb; }
       .label { position: absolute; inset: 0; width: 4in; height: 2in; padding: 2.2mm; overflow: hidden; border: .45mm solid #667085; border-radius: 3mm; background: #fff; transform: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       header { height: 10mm; display: flex; align-items: center; justify-content: space-between; border-bottom: .6mm solid #138f8c; padding: 0 1mm 1.4mm; }
-      .brand { display: flex; align-items: center; gap: 2.5mm; color: #344054; font-size: 8pt; font-weight: 800; letter-spacing: 1.3pt; }
-      .brand img { width: 15mm; height: 7.5mm; object-fit: contain; }
-      .type { border-radius: 4mm; padding: 1.2mm 3mm; background: #667085; color: #fff; font-size: 7pt; font-weight: 800; letter-spacing: .4pt; }
+      .brand { display: flex; align-items: center; gap: 2mm; height: 8mm; }
+      .brand .logo-box { display: flex; width: 17mm; height: 7.5mm; align-items: center; justify-content: center; overflow: hidden; }
+      .brand img { width: 100%; height: 100%; object-fit: contain; }
+      .brand .asde { transform: scale(1.65); }
+      .brand i { display: block; width: .25mm; height: 5.5mm; background: #cbd5e1; }
+      .type { border-radius: 4mm; padding: 1.2mm 3mm; background: #667085; color: #fff; font-size: 7pt; font-weight: 800; letter-spacing: .4pt; text-transform: uppercase; }
       .content { display: grid; grid-template-columns: minmax(0, 1fr) 20mm; gap: 2.5mm; padding: 2mm 1mm 0; }
       .caption { color: #667085; font-size: 6.5pt; font-weight: 700; letter-spacing: .8pt; }
       .name { margin-top: .5mm; font-size: 12pt; line-height: 1.02; font-weight: 900; color: #101828; }
       .document { margin-top: 1.2mm; font: 800 10pt Consolas, monospace; color: #101828; }
-      .event { margin-top: 3mm; padding-top: 1.5mm; border-top: .3mm dashed #cbd5e1; color: #475467; font-size: 7pt; }
-      .id-caption { margin-top: 1.5mm; }
-      .id { margin-top: .5mm; font: 700 6.5pt Consolas, monospace; }
+      .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2mm; margin-top: 2mm; }
+      .meta div { min-width: 0; }
+      .meta span { display: block; color: #667085; font-size: 5.5pt; font-weight: 700; letter-spacing: .5pt; }
+      .meta strong { display: block; margin-top: .3mm; overflow: hidden; color: #101828; font-size: 7pt; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+      .event { position: absolute; right: 3.2mm; bottom: 2.5mm; left: 3.2mm; margin: 0; padding-top: 1.4mm; border-top: .3mm dashed #cbd5e1; color: #344054; font-size: 9.5pt; font-weight: 700; line-height: 1.05; text-align: center; }
+      .event span { color: #138f8c; font-weight: 800; }
       .qr { width: 20mm; height: 20mm; align-self: start; justify-self: end; padding: .7mm; border: .3mm solid #e4e7ec; border-radius: 1.5mm; }
       .qr svg { display: block; width: 100%; height: 100%; }
     </style>`;
@@ -140,7 +149,9 @@ export function BadgePrintModal({
     .label { width: 520px; min-height: 250px; border: 2px solid #138f8c; border-radius: 12px; background: white; padding: 18px 20px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); color: #101828; }
     .top { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #ff6b13; padding-bottom: 10px; }
     .brand-wrap { display: flex; align-items: center; gap: 10px; }
-    .brand-wrap img { height: 34px; width: auto; }
+    .brand-wrap img { height: 34px; width: auto; object-fit: contain; }
+    .brand-wrap .asde { width: 76px; transform: scale(1.45); }
+    .brand-wrap .separator { width: 1px; height: 28px; background: #cbd5e1; }
     .brand { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #138f8c; }
     .type { border-radius: 999px; background: #ff6b13; color: white; padding: 3px 9px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
     .body { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 20px; align-items: end; padding-top: 14px; }
@@ -148,16 +159,14 @@ export function BadgePrintModal({
     h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.15; }
     .doc { margin-top: 3px; font-family: monospace; font-size: 12px; font-weight: 700; color: #101828; }
     .muted { margin-top: 4px; color: #475467; font-size: 13px; }
-    .event { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: 12px; color: #475467; }
-    .bottom { margin-top: 18px; }
-    .id { font-family: monospace; font-size: 12px; }
+    .event { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: 15px; font-weight: 700; color: #344054; text-align: center; }
     .qr { width: 118px; height: 118px; background: #fff; justify-self: end; }
     .qr svg { display: block; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
   <section class="label">
-    <div class="top"><div class="brand-wrap"><img src="/logo-cf.png" alt="Costa del Faro" /><div class="brand">Costa del Faro</div></div>${b.tipo ? `<div class="type">${escapeHtml(b.tipo)}</div>` : ""}</div>
+    <div class="top"><div class="brand-wrap"><img class="asde" src="/logo-asde.png" alt="Alcaldía de Santo Domingo Este" /><span class="separator"></span><img src="/logo-cf.png" alt="Costa del Faro" /><div class="brand">ASDE · Costa del Faro</div></div>${b.tipo ? `<div class="type">${escapeHtml(b.tipo.toUpperCase())}</div>` : ""}</div>
     <div class="body">
       <div>
         <div class="eyebrow">Nombre</div>
@@ -166,7 +175,6 @@ export function BadgePrintModal({
         ${b.cargo ? `<div class="eyebrow">Cargo</div><div class="muted">${escapeHtml(b.cargo)}</div>` : ""}
         ${b.institucion ? `<div class="eyebrow">Institucion</div><div class="muted">${escapeHtml(b.institucion)}</div>` : ""}
         ${b.evento ? `<div class="event"><strong>Evento:</strong> ${escapeHtml(b.evento)}</div>` : ""}
-        <div class="bottom"><div class="eyebrow">ID</div><div class="id">${escapeHtml(b.id.toUpperCase())}</div></div>
       </div>
       <div class="qr">${qr}</div>
     </div>
@@ -194,12 +202,16 @@ export function BadgePrintModal({
           <div className="ticket-card mx-auto aspect-[2/1] w-full max-w-[560px] overflow-hidden rounded-[var(--radius)] border-2 border-[#138f8c] bg-white p-5 text-[#101828] shadow-card-soft">
             <div className="ticket-header flex items-center justify-between border-b-2 border-accent pb-2">
               <div className="flex items-center gap-2">
+                <span className="flex h-10 w-16 items-center justify-center overflow-hidden">
+                  <img src="/logo-asde.png" alt="Alcaldía de Santo Domingo Este" className="h-full w-full scale-[1.6] object-contain" />
+                </span>
+                <span className="h-8 w-px bg-[#cbd5e1]" aria-hidden="true" />
                 <img src="/logo-cf.png" alt="Costa del Faro" className="h-10 w-auto" />
-                <div className="text-xs font-bold uppercase tracking-widest text-[#138f8c]">Costa del Faro</div>
+                <div className="hidden text-[10px] font-bold uppercase tracking-widest text-[#138f8c] sm:block">ASDE · Costa del Faro</div>
               </div>
               {b.tipo && (
                 <span className="rounded-full bg-[#ff6b13] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                  {b.tipo}
+                  {b.tipo.toUpperCase()}
                 </span>
               )}
             </div>
@@ -223,14 +235,10 @@ export function BadgePrintModal({
                   </div>
                 )}
                 {b.evento && (
-                  <div className="mt-3 border-t border-dashed border-[#cbd5e1] pt-2 text-xs text-[#667085]">
-                    <span className="font-medium text-[#138f8c]">Evento:</span> {b.evento}
+                  <div className="mt-3 border-t border-dashed border-[#cbd5e1] pt-2 text-center text-base font-bold text-[#344054]">
+                    <span className="font-bold text-[#138f8c]">Evento:</span> {b.evento}
                   </div>
                 )}
-                <div className="mt-4 min-w-0 text-[10px] leading-tight text-[#667085]">
-                  <div>ID</div>
-                  <div className="break-all font-mono text-xs text-[#101828]">{b.id.toUpperCase()}</div>
-                </div>
               </div>
               <div
                 className="ticket-qr h-28 w-28 shrink-0 bg-white [&_svg]:block [&_svg]:h-full [&_svg]:w-full"

@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, Lock, LogIn, Mail, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { InstitutionLogos } from "@/components/common/InstitutionLogos";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Iniciar sesión — Costa del Faro" }] }),
@@ -14,10 +15,16 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [authLoading, navigate, user]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -49,12 +56,10 @@ function LoginPage() {
           {/* Panel izquierdo (branding) */}
           <div className="relative hidden flex-col justify-between p-10 text-white lg:flex">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-16 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-elegant">
-                <img src="/logo-cf.png" alt="Costa del Faro" className="h-full w-full object-contain" />
-              </div>
+              <InstitutionLogos className="h-16 w-36 shrink-0 rounded-xl bg-white px-2 py-1.5 shadow-elegant" />
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-brand-yellow">
-                  Costa del Faro
+                  ASDE · Costa del Faro
                 </div>
                 <div className="font-display text-lg font-bold leading-tight">
                   Registro de Eventos y Visitas
@@ -95,7 +100,7 @@ function LoginPage() {
             </div>
 
             <div className="text-xs text-white/50">
-              © {new Date().getFullYear()} Costa del Faro · Uso institucional
+              © {new Date().getFullYear()} ASDE · Costa del Faro · Uso institucional
             </div>
 
             <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
@@ -104,11 +109,9 @@ function LoginPage() {
           {/* Panel derecho (formulario) */}
           <div className="relative bg-card p-8 sm:p-10">
             <div className="mb-8 flex items-center gap-3 lg:hidden">
-              <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-card-soft ring-1 ring-border">
-                <img src="/logo-cf.png" alt="Costa del Faro" className="h-full w-full object-contain" />
-              </div>
+              <InstitutionLogos className="h-12 w-28 shrink-0 rounded-xl bg-white px-2 py-1 shadow-card-soft ring-1 ring-border" />
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent">Costa del Faro</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent">ASDE · Costa del Faro</div>
                 <div className="font-display text-base font-bold text-foreground">Registro de Eventos y Visitas</div>
               </div>
             </div>

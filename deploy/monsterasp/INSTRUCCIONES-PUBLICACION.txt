@@ -1,0 +1,39 @@
+PUBLICACION EN MONSTERASP
+========================
+
+ACTUALIZAR UN SITIO EXISTENTE
+-----------------------------
+1. Haz una copia del archivo wwwroot/backend/.env.
+2. En MonsterASP detén o reinicia el sitio si hay archivos bloqueados.
+3. Extrae el ZIP directamente dentro de wwwroot y permite sobrescribir.
+4. Conserva o restaura wwwroot/backend/.env. El ZIP nunca incluye tus claves reales.
+5. En phpMyAdmin importa solamente:
+   backend/database/02-actualizacion-tipos.sql
+6. Reinicia el sitio.
+7. Cierra todas las pestañas antiguas y abre el sitio con Ctrl+F5.
+8. Comprueba:
+   https://TU-DOMINIO/api/health
+   https://TU-DOMINIO/api/db-health
+
+INSTALACION NUEVA
+-----------------
+1. Crea una base MySQL vacia desde el panel de MonsterASP.
+2. Abre phpMyAdmin y selecciona esa base.
+3. Importa backend/database/00-esquema-instalacion-nueva.sql.
+4. Importa backend/database/01-datos-iniciales.sql.
+5. Habilita PHP 8.3 o posterior en Websites > Manage > Scripting.
+6. Copia backend/.env.example como backend/.env y completa las credenciales reales.
+7. Activa HTTPS y reinicia el sitio.
+
+VARIABLES REQUERIDAS EN backend/.env
+------------------------------------
+APP_DEBUG=false
+CORS_ORIGIN=https://TU-DOMINIO.runasp.net
+DB_HOST=HOST-MYSQL-DE-MONSTERASP
+DB_PORT=3306
+DB_NAME=NOMBRE-DE-LA-BASE
+DB_USER=USUARIO-DE-LA-BASE
+DB_PASS=CONTRASENA-DE-LA-BASE
+DB_TIMEOUT=10
+
+No importes el esquema de instalacion nueva sobre una base con datos: ese archivo recrea las tablas.

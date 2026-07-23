@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { InstitutionLogos } from "@/components/common/InstitutionLogos";
 
 const nav = [
   {
@@ -60,9 +61,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white p-1 shadow-sm">
-            <img src="/logo-cf.png" alt="Costa del Faro" className="max-h-full max-w-full object-contain" />
-          </div>
+          <InstitutionLogos className="h-10 w-20 shrink-0 rounded-md bg-white px-1.5 py-1 shadow-sm group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&>span:nth-child(2)]:hidden group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="font-display text-base font-semibold leading-tight text-sidebar-foreground">G-Visitantes</div>
             <div className="text-[10px] uppercase tracking-widest text-gold">Eventos · Protocolo</div>
@@ -97,7 +96,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="px-2 py-2 text-[10px] text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
-          MVP · Costa del Faro
+          ASDE · Costa del Faro
         </div>
       </SidebarFooter>
     </Sidebar>

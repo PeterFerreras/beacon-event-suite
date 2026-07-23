@@ -13,8 +13,8 @@ function AppLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate({ to: "/login", search: { redirect: pathname } });
+    if (!loading && !user && pathname !== "/login") {
+      navigate({ to: "/login", search: { redirect: pathname }, replace: true });
     }
   }, [loading, navigate, pathname, user]);
 
@@ -22,7 +22,10 @@ function AppLayout() {
     if (loading || !user) return;
     const module = moduleForPath(pathname);
     if (module && !canAccess(module)) {
-      navigate({ to: firstAllowedPath(user), replace: true });
+      const destination = firstAllowedPath(user);
+      if (destination !== pathname) {
+        navigate({ to: destination, replace: true });
+      }
     }
   }, [canAccess, loading, navigate, pathname, user]);
 

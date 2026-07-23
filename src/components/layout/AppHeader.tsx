@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth, type AppModule } from "@/lib/auth";
 import { useNavigate } from "@tanstack/react-router";
+import { InstitutionLogos } from "@/components/common/InstitutionLogos";
 
 const nav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: "dashboard" },
@@ -44,12 +45,10 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:px-6">
         <div className="flex items-center justify-between gap-4">
           <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-elegant">
-              <img src="/logo-cf.png" alt="Costa del Faro" className="h-full w-full object-contain" />
-            </div>
+            <InstitutionLogos className="h-12 w-28 shrink-0 rounded-xl bg-white px-2 py-1 shadow-elegant" />
             <div className="min-w-0 leading-tight">
               <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-yellow">
-                Costa del Faro
+                ASDE · Costa del Faro
               </div>
               <div className="truncate font-display text-base font-bold sm:text-lg">
                 Registro de Eventos y Visitas
