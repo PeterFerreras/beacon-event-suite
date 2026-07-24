@@ -19,7 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { CedulaQrScanner, type CedulaQrResult } from "@/components/common/CedulaQrScanner";
+import { LazyCedulaQrScanner as CedulaQrScanner, type CedulaQrResult } from "@/components/common/LazyCedulaQrScanner";
 import { BadgePrintModal, type BadgeData } from "@/components/labels/BadgePrintModal";
 import { StatCard } from "@/components/common/StatCard";
 import { Badge } from "@/components/ui/badge";

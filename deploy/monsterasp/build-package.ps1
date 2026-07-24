@@ -31,6 +31,7 @@ Copy-Item -Path (Join-Path $staticOutput "*") -Destination $wwwroot -Recurse -Fo
 Move-Item -LiteralPath (Join-Path $wwwroot "index.monsterasp.html") -Destination (Join-Path $wwwroot "_shell.html")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "web.config") -Destination (Join-Path $wwwroot "web.config")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "CONFIGURAR-BASE-DE-DATOS.txt") -Destination (Join-Path $wwwroot "CONFIGURAR-BASE-DE-DATOS.txt")
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "CORRECCION-CONEXION-MYSQL.txt") -Destination (Join-Path $wwwroot "CORRECCION-CONEXION-MYSQL.txt")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "INSTRUCCIONES-PUBLICACION.txt") -Destination (Join-Path $wwwroot "INSTRUCCIONES-PUBLICACION.txt")
 
 $backendTarget = Join-Path $wwwroot "backend"
@@ -46,8 +47,41 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "backend\database\seed.sql") -Des
 Copy-Item -LiteralPath (Join-Path $projectRoot "backend\database\2026-07-22-guest-types.sql") -Destination (Join-Path $databaseTarget "02-actualizacion-tipos.sql")
 
 if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
-& tar.exe -a -c -f $zipPath -C $wwwroot .
-if ($LASTEXITCODE -ne 0) { throw "No se pudo crear el archivo ZIP." }
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zipStream = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew)
+$archive = New-Object IO.Compression.ZipArchive(
+  $zipStream,
+  [IO.Compression.ZipArchiveMode]::Create,
+  $false
+)
+try {
+  $files = Get-ChildItem -LiteralPath $wwwroot -File -Recurse
+  foreach ($file in $files) {
+    $relativePath = $file.FullName.Substring($wwwroot.Length).TrimStart([char[]]@('\', '/')).Replace('\', '/')
+    [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+      $archive,
+      $file.FullName,
+      $relativePath,
+      [IO.Compression.CompressionLevel]::Optimal
+    ) | Out-Null
+  }
+} finally {
+  $archive.Dispose()
+  $zipStream.Dispose()
+}
+
+$verificationArchive = [IO.Compression.ZipFile]::OpenRead($zipPath)
+try {
+  $invalidEntries = @($verificationArchive.Entries | Where-Object { $_.FullName.Contains('\') })
+  if ($verificationArchive.Entries.Count -eq 0 -or $invalidEntries.Count -gt 0) {
+    throw "El ZIP generado esta vacio o contiene rutas incompatibles con WebFTP."
+  }
+  $entryCount = $verificationArchive.Entries.Count
+} finally {
+  $verificationArchive.Dispose()
+}
 
 Write-Host "Paquete creado: $zipPath"
-Write-Host "Antes de publicar, crea backend/.env en el servidor usando .env.example."
+Write-Host "Archivos incluidos: $entryCount"
+Write-Host "Antes de publicar, configura backend/.env o backend/config/database.env."

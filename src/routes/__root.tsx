@@ -71,6 +71,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const isStaticMonsterAspSpa = import.meta.env.VITE_MONSTERASP_SPA === "true";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -91,7 +93,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
-  shellComponent: RootShell,
+  // TanStack Start mounts this shell at the document level during SSR.
+  // The MonsterASP artifact is a classic SPA mounted in #root, so rendering
+  // html/body there corrupts React's event tree and makes focus events loop.
+  ...(isStaticMonsterAspSpa ? {} : { shellComponent: RootShell }),
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,

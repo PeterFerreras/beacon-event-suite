@@ -14,6 +14,24 @@ export type AppModule = "dashboard" | "visitantes" | "registro" | "eventos" | "i
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function readStoredSession(): { token: string | null; user: AuthUser | null } {
+  if (typeof window === "undefined") return { token: null, user: null };
+  const token = window.localStorage.getItem("cf-auth-token");
+  const rawUser = window.localStorage.getItem("cf-auth-user");
+  if (!token || !rawUser) {
+    window.localStorage.removeItem("cf-auth-token");
+    window.localStorage.removeItem("cf-auth-user");
+    return { token: null, user: null };
+  }
+  try {
+    return { token, user: JSON.parse(rawUser) as AuthUser };
+  } catch {
+    window.localStorage.removeItem("cf-auth-token");
+    window.localStorage.removeItem("cf-auth-user");
+    return { token: null, user: null };
+  }
+}
+
 const accessByRole: Record<UserRole, AppModule[]> = {
   Administrador: ["dashboard", "visitantes", "registro", "eventos", "invitados", "etiquetas", "reportes", "configuracion", "usuarios", "asistencia"],
   "Gestor de eventos": ["dashboard", "eventos", "invitados", "etiquetas"],
@@ -21,16 +39,15 @@ const accessByRole: Record<UserRole, AppModule[]> = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => (typeof window === "undefined" ? null : window.localStorage.getItem("cf-auth-token")));
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem("cf-auth-user");
-    return raw ? JSON.parse(raw) as AuthUser : null;
-  });
-  const [loading, setLoading] = useState(!!token);
+  const [storedSession] = useState(readStoredSession);
+  const [token, setToken] = useState<string | null>(storedSession.token);
+  const [user, setUser] = useState<AuthUser | null>(storedSession.user);
+  const [loading, setLoading] = useState(!!storedSession.token);
 
   useEffect(() => {
-    if (!token) {
+    // Validate only the session that existed when the app opened. A successful
+    // login already returns the current user and must not start a second request.
+    if (!storedSession.token) {
       setLoading(false);
       return;
     }
@@ -46,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [storedSession.token]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,

@@ -1,0 +1,35 @@
+CONEXION PHP + MYSQL EN MONSTERASP
+=================================
+
+El paquete incluye backend/.env y backend/config/database.env con la
+configuracion proporcionada. El segundo archivo es el respaldo no oculto
+para WebFTP.
+
+La aplicacion usa:
+- PHP PDO_MYSQL
+- Host interno de MonsterASP
+- Puerto 3306
+- SSL Preferred
+- Variables separadas para evitar errores al interpretar caracteres especiales
+
+COMPROBACION
+------------
+1. Abre /api/health
+   Debe mostrar: "mysqlConfigured": true
+
+2. Abre /api/db-health
+   Debe mostrar: {"ok":true,"database":"connected"}
+
+CODIGOS DE ERROR
+----------------
+1045: Usuario o contrasena rechazados.
+2002: Host MySQL inaccesible.
+2054: El usuario requiere un metodo de autenticacion incompatible con PDO_MYSQL.
+
+Si aparece el codigo 2054 con auth_gssapi_client, MonsterASP debe restablecer
+el usuario MySQL con autenticacion nativa compatible con PHP PDO_MYSQL.
+Este cambio pertenece al servidor de base de datos y no puede realizarse
+desde el codigo PHP, el archivo .env o phpMyAdmin.
+
+Despues de publicar conserva:
+APP_DEBUG=false

@@ -104,26 +104,66 @@ export type PadronPersona = {
   nacionalidad?: string | null;
   fuente?: string;
 };
-const API_URL = (
-  import.meta.env.VITE_API_URL ??
-  (typeof window === "undefined" ? "http://127.0.0.1:8081/api" : `${window.location.origin}/api`)
-).replace(/\/$/, "");
+const API_URL = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
+
+const API_TIMEOUT_MS = 12_000;
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window === "undefined" ? "" : window.localStorage.getItem("cf-auth-token");
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!response.ok)
-    throw new Error(data?.detail || data?.error || "No se pudo completar la solicitud.");
-  return data as T;
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const abortFromCaller = () => controller.abort();
+  options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+    const text = await response.text();
+    let data: unknown = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      throw new Error(
+        response.ok
+          ? "El servidor devolvió una respuesta inválida."
+          : `El servidor devolvió un error HTTP ${response.status}.`,
+      );
+    }
+    if (!response.ok) {
+      const errorData =
+        data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+      if (errorData?.error === "No se pudo conectar a MySQL") {
+        const databaseError =
+          typeof errorData.databaseError === "string" ? errorData.databaseError : null;
+        throw new Error(
+          databaseError ??
+            "El servidor no puede conectar con MySQL. Revisa backend/.env o backend/config/database.env.",
+        );
+      }
+      const detail = typeof errorData?.detail === "string" ? errorData.detail : null;
+      const message = typeof errorData?.error === "string" ? errorData.error : null;
+      throw new Error(detail || message || "No se pudo completar la solicitud.");
+    }
+    return data as T;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("El servidor tardó demasiado en responder. Intenta nuevamente.");
+    }
+    if (error instanceof TypeError) {
+      throw new Error("No se pudo comunicar con el servidor. Verifica la conexión e intenta nuevamente.");
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
 }
 
 async function download(path: string): Promise<void> {

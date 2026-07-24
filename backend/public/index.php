@@ -11,14 +11,34 @@ header('Access-Control-Allow-Origin: ' . $config['cors_origin']);
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 if ($method === 'OPTIONS') { http_response_code(204); exit; }
-if ($method === 'GET' && $path === '/api/health') { Response::json(['ok'=>true,'driver'=>'mysql','time'=>now_sql()]); exit; }
+if ($method === 'GET' && $path === '/api/health') { Response::json(['ok'=>true,'driver'=>'mysql','mysqlConfigured'=>(bool)($config['database']['configured']??false),'time'=>now_sql()]); exit; }
 
 require __DIR__ . '/../src/Database.php';
 require __DIR__ . '/../src/Transformers.php';
 require __DIR__ . '/../src/padron.php';
 require __DIR__ . '/../src/auth.php';
+if (empty($config['database']['configured'])) {
+    Response::error('Falta configurar MySQL. Crea backend/.env o backend/config/database.env con los datos de MonsterASP.', 500);
+    exit;
+}
 try { $db = new Database($config['database']); }
-catch (Throwable $e) { Response::error('No se pudo conectar a MySQL', 500, ['detail'=>$config['debug'] ? $e->getMessage() : null]); exit; }
+catch (Throwable $e) {
+    $driverCode = $e instanceof PDOException && is_array($e->errorInfo ?? null)
+        ? (int)($e->errorInfo[1] ?? 0)
+        : (int)$e->getCode();
+    $databaseError = match ($driverCode) {
+        1045 => 'MySQL rechazo el usuario o la contrasena configurados.',
+        2002 => 'No se pudo alcanzar el host MySQL configurado.',
+        2054 => 'El usuario MySQL requiere un metodo de autenticacion incompatible con PHP PDO_MYSQL. MonsterASP debe restablecerlo con autenticacion nativa.',
+        default => 'MySQL rechazo la conexion antes de iniciar la aplicacion.',
+    };
+    Response::error('No se pudo conectar a MySQL', 500, [
+        'databaseCode' => $driverCode ?: null,
+        'databaseError' => $databaseError,
+        'detail' => $config['debug'] ? $e->getMessage() : null,
+    ]);
+    exit;
+}
 
 try { route($method, $path, $db); }
 catch (Throwable $e) { Response::error('Error interno del servidor', 500, ['detail'=>$config['debug'] ? $e->getMessage() : null]); }

@@ -1,8 +1,11 @@
 CONFIGURACION MYSQL PARA MONSTERASP
 ==================================
 
-1. En wwwroot/backend, copia el archivo .env.example con el nombre .env
-2. Abre .env y reemplaza los valores siguientes con los datos del panel MySQL de MonsterASP:
+1. Elige una de estas dos opciones:
+   A) En wwwroot/backend, copia .env.example con el nombre .env
+   B) Si WebFTP no muestra archivos que empiezan con punto, en
+      wwwroot/backend/config copia database.env.example con el nombre database.env
+2. Abre el archivo elegido y reemplaza los valores siguientes con los datos del panel MySQL de MonsterASP:
 
 APP_DEBUG=false
 CORS_ORIGIN=https://TU-DOMINIO.runasp.net
@@ -12,6 +15,7 @@ DB_PORT=3306
 DB_NAME=NOMBRE-DE-LA-BASE
 DB_USER=USUARIO-DE-LA-BASE
 DB_PASS=CONTRASENA-DE-LA-BASE
+DB_SSL_MODE=Preferred
 DB_TIMEOUT=10
 
 Ejemplo de estructura (NO copies estos valores literalmente):
@@ -23,12 +27,18 @@ DB_PORT=3306
 DB_NAME=mi_base
 DB_USER=mi_usuario
 DB_PASS=mi_contrasena_segura
+DB_SSL_MODE=Preferred
 DB_TIMEOUT=10
 
 IMPORTANTE
 ----------
 - No agregues espacios alrededor del signo =
-- No subas .env a GitHub.
+- No subas .env ni database.env a GitHub.
 - Usa el host MySQL indicado por MonsterASP; normalmente no es localhost.
-- Importa primero backend/database/schema.sql y despues backend/database/seed.sql.
-- Verifica la conexion abriendo https://TU-DOMINIO/api/health
+- Las variables del panel de MonsterASP tienen prioridad sobre los archivos.
+  Elimina DB_CONNECTION_STRING y cualquier DB_* antiguo antes de publicar
+  el paquete CONFIGURADO.
+- Para una instalacion nueva importa primero 00-esquema-instalacion-nueva.sql
+  y despues 01-datos-iniciales.sql.
+- Verifica PHP en https://TU-DOMINIO/api/health
+- Verifica MySQL en https://TU-DOMINIO/api/db-health

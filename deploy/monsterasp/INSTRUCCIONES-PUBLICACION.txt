@@ -1,17 +1,36 @@
 PUBLICACION EN MONSTERASP
 ========================
 
+PAQUETE CONFIGURADO
+-------------------
+El ZIP cuyo nombre contiene CONFIGURADO incluye backend/.env y el respaldo
+backend/config/database.env con las credenciales suministradas. El respaldo
+permite funcionar si WebFTP omite archivos ocultos. Tratalo como privado.
+
+Antes de extraerlo, abre las variables de entorno del sitio en MonsterASP:
+- Elimina una variable antigua llamada DB_CONNECTION_STRING.
+- Elimina variables DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS,
+  DB_SSL_MODE y DB_TIMEOUT que tengan valores anteriores.
+
+Las variables configuradas en el panel tienen prioridad sobre backend/.env.
+Si decides mantenerlas en el panel, todas deben tener los mismos valores
+que backend/.env.
+
 ACTUALIZAR UN SITIO EXISTENTE
 -----------------------------
-1. Haz una copia del archivo wwwroot/backend/.env.
+1. Haz una copia del archivo wwwroot/backend/.env o
+   wwwroot/backend/config/database.env, segun el que utilices.
 2. En MonsterASP detén o reinicia el sitio si hay archivos bloqueados.
-3. Extrae el ZIP directamente dentro de wwwroot y permite sobrescribir.
-4. Conserva o restaura wwwroot/backend/.env. El ZIP nunca incluye tus claves reales.
-5. En phpMyAdmin importa solamente:
+3. Elimina solamente la carpeta wwwroot/assets anterior.
+4. Extrae el ZIP directamente dentro de wwwroot y permite sobrescribir.
+5. Si usas el ZIP CONFIGURADO, conserva backend/.env y
+   backend/config/database.env incluidos.
+   Si usas el ZIP generico, restaura tu archivo privado de conexion.
+6. En phpMyAdmin importa solamente:
    backend/database/02-actualizacion-tipos.sql
-6. Reinicia el sitio.
-7. Cierra todas las pestañas antiguas y abre el sitio con Ctrl+F5.
-8. Comprueba:
+7. Reinicia el sitio.
+8. Cierra todas las pestañas antiguas y abre el sitio con Ctrl+F5.
+9. Comprueba:
    https://TU-DOMINIO/api/health
    https://TU-DOMINIO/api/db-health
 
@@ -22,11 +41,15 @@ INSTALACION NUEVA
 3. Importa backend/database/00-esquema-instalacion-nueva.sql.
 4. Importa backend/database/01-datos-iniciales.sql.
 5. Habilita PHP 8.3 o posterior en Websites > Manage > Scripting.
-6. Copia backend/.env.example como backend/.env y completa las credenciales reales.
+6. Configura MySQL con una de estas opciones:
+   - Copia backend/.env.example como backend/.env.
+   - Si WebFTP no admite archivos ocultos, copia
+     backend/config/database.env.example como backend/config/database.env.
+   Completa las credenciales reales en el archivo elegido.
 7. Activa HTTPS y reinicia el sitio.
 
-VARIABLES REQUERIDAS EN backend/.env
-------------------------------------
+VARIABLES REQUERIDAS EN backend/.env O backend/config/database.env
+------------------------------------------------------------------
 APP_DEBUG=false
 CORS_ORIGIN=https://TU-DOMINIO.runasp.net
 DB_HOST=HOST-MYSQL-DE-MONSTERASP
@@ -34,6 +57,7 @@ DB_PORT=3306
 DB_NAME=NOMBRE-DE-LA-BASE
 DB_USER=USUARIO-DE-LA-BASE
 DB_PASS=CONTRASENA-DE-LA-BASE
+DB_SSL_MODE=Preferred
 DB_TIMEOUT=10
 
 No importes el esquema de instalacion nueva sobre una base con datos: ese archivo recrea las tablas.

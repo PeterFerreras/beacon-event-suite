@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Loader2, Plus, Printer, Search, Trash2, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { CedulaQrScanner, type CedulaQrResult } from "@/components/common/CedulaQrScanner";
+import { LazyCedulaQrScanner as CedulaQrScanner, type CedulaQrResult } from "@/components/common/LazyCedulaQrScanner";
 import { BadgePrintModal, type BadgeData } from "@/components/labels/BadgePrintModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

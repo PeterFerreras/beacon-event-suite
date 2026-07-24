@@ -17,8 +17,12 @@ dist-ssr
 .nitro
 *.local
 backend/.env
+backend/config/database.env
 deploy/monsterasp/package/
 deploy/monsterasp/*.zip
+deploy/monsterasp/edge-*-profile/
+deploy/monsterasp/*-verification/
+registroeventos-monsterasp-CONFIGURADO-*.zip
 
 # Wrangler / Cloudflare
 .wrangler/

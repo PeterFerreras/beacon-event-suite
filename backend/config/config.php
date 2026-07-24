@@ -2,9 +2,12 @@
 declare(strict_types=1);
 
 load_env(__DIR__ . '/../.env');
+// WebFTP can hide or skip dotfiles. MonsterASP installations may use this
+// visible alternative without changing any PHP source.
+load_env(__DIR__ . '/database.env');
 
 return [
-    'debug' => filter_var(envv('APP_DEBUG', 'true'), FILTER_VALIDATE_BOOL),
+    'debug' => filter_var(envv('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL),
     'cors_origin' => envv('CORS_ORIGIN', '*'),
     'database' => db_config(),
 ];
@@ -35,10 +38,15 @@ function db_config(): array {
         $host = $p['server'] ?? $p['host'] ?? '127.0.0.1';
         $port = $p['port'] ?? '3306';
         $name = $p['database'] ?? $p['dbname'] ?? '';
-        return ['dsn' => "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", 'user' => $p['uid'] ?? $p['user'] ?? '', 'password' => $p['pwd'] ?? $p['password'] ?? '', 'timeout' => (int) envv('DB_TIMEOUT', '10')];
+        $user = $p['uid'] ?? $p['user'] ?? '';
+        return ['dsn' => "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", 'user' => $user, 'password' => $p['pwd'] ?? $p['password'] ?? '', 'timeout' => (int) envv('DB_TIMEOUT', '10'), 'ssl_mode' => $p['sslmode'] ?? 'Preferred', 'configured' => $host !== '' && $name !== '' && $user !== ''];
     }
-    $host = envv('DB_HOST', '127.0.0.1');
+    $configuredHost = envv('DB_HOST');
+    $configuredName = envv('DB_NAME');
+    $configuredUser = envv('DB_USER');
+    $host = $configuredHost !== '' ? $configuredHost : '127.0.0.1';
     $port = envv('DB_PORT', '3306');
-    $name = envv('DB_NAME', 'g_visitantes');
-    return ['dsn' => "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", 'user' => envv('DB_USER', 'root'), 'password' => envv('DB_PASS'), 'timeout' => (int) envv('DB_TIMEOUT', '10')];
+    $name = $configuredName !== '' ? $configuredName : 'g_visitantes';
+    $user = $configuredUser !== '' ? $configuredUser : 'root';
+    return ['dsn' => "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", 'user' => $user, 'password' => envv('DB_PASS'), 'timeout' => (int) envv('DB_TIMEOUT', '10'), 'ssl_mode' => envv('DB_SSL_MODE', 'Preferred'), 'configured' => $configuredHost !== '' && $configuredName !== '' && $configuredUser !== ''];
 }

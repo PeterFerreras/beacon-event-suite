@@ -32,7 +32,6 @@ function LoginPage() {
       setLoading(true);
       await login(correo, password);
       toast.success("Sesión iniciada");
-      navigate({ to: "/dashboard" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo iniciar sesión");
     } finally {
@@ -128,7 +127,7 @@ function LoginPage() {
               </p>
             </div>
 
-            <form className="space-y-5" onSubmit={submit}>
+            <form className="space-y-5" onSubmit={submit} aria-busy={loading}>
               <div>
                 <Label htmlFor="correo">Correo institucional</Label>
                 <div className="relative mt-1.5">
@@ -141,6 +140,8 @@ function LoginPage() {
                     className="h-11 pl-9"
                     autoComplete="username"
                     placeholder="Correo"
+                    required
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -162,6 +163,8 @@ function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
                     className="h-11 pl-9"
                     autoComplete="current-password"
                     placeholder="Contraseña"
@@ -172,7 +175,7 @@ function LoginPage() {
               <Button
                 type="submit"
                 className="h-11 w-full bg-navy text-white shadow-elegant hover:bg-navy/90"
-                disabled={loading}
+                disabled={loading || authLoading}
               >
                 <LogIn className="mr-2 h-4 w-4" />
                 {loading ? "Ingresando..." : "Entrar al panel"}
